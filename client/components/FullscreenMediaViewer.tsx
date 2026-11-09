@@ -1,5 +1,5 @@
-import React from "react";
-import { ChevronLeft, ChevronRight, Download, X } from "lucide-react";
+import React, { useEffect, useRef, useState } from "react";
+import { ChevronLeft, ChevronRight, Download, Maximize, Minimize, X, ZoomIn, ZoomOut } from "lucide-react";
 
 export interface FullscreenMediaItem {
   url: string;
@@ -16,6 +16,8 @@ interface FullscreenMediaViewerProps {
   onSelectedIndexChange: (index: number | null) => void;
 }
 
+const ZOOM_STEPS = [1, 1.25, 1.5, 2, 2.5, 3];
+
 const isPdfOrDocument = (filename: string): boolean => {
   const lowerName = filename.toLowerCase();
   return lowerName.endsWith(".pdf") || lowerName.endsWith(".doc") || lowerName.endsWith(".docx");
@@ -26,9 +28,30 @@ const FullscreenMediaViewer: React.FC<FullscreenMediaViewerProps> = ({
   selectedIndex,
   onSelectedIndexChange,
 }) => {
+  const rootRef = useRef<HTMLDivElement>(null);
+  const [zoomIndex, setZoomIndex] = useState(0);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+
+  useEffect(() => {
+    setZoomIndex(0);
+  }, [selectedIndex]);
+
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      setIsFullscreen(document.fullscreenElement === rootRef.current);
+    };
+    document.addEventListener("fullscreenchange", handleFullscreenChange);
+    return () => document.removeEventListener("fullscreenchange", handleFullscreenChange);
+  }, []);
+
   const selectedItem = selectedIndex === null ? null : items[selectedIndex];
 
   if (!selectedItem) return null;
+
+  const isImage = selectedItem.type === "image";
+  const zoom = ZOOM_STEPS[zoomIndex];
+  const canZoomOut = zoomIndex > 0;
+  const canZoomIn = zoomIndex < ZOOM_STEPS.length - 1;
 
   const handlePrev = () => {
     if (selectedIndex !== null && selectedIndex > 0) {
@@ -42,17 +65,63 @@ const FullscreenMediaViewer: React.FC<FullscreenMediaViewerProps> = ({
     }
   };
 
+  const toggleFullscreen = async () => {
+    try {
+      if (document.fullscreenElement) {
+        await document.exitFullscreen();
+      } else {
+        await rootRef.current?.requestFullscreen();
+      }
+    } catch (error) {
+      console.error("Fullscreen toggle failed", error);
+    }
+  };
+
   return (
-    <div className="fixed inset-0 z-50 bg-black/95">
-      <div className="absolute inset-x-0 top-0 z-10 flex items-center justify-between p-4">
-        <div className="min-w-0 flex-1">
-          <p className="truncate font-medium text-white">{selectedItem.name}</p>
-          {selectedItem.description && (
-            <p className="truncate text-sm text-gray-400">{selectedItem.description}</p>
+    <div ref={rootRef} className="fixed inset-0 z-50 flex flex-col bg-black/95">
+      <div className="flex items-center justify-between border-b border-gray-700 bg-black p-4">
+        <div className="flex-1" />
+        <div className="flex items-center gap-2">
+          {isImage && (
+            <>
+              <button
+                onClick={() => setZoomIndex((index) => index - 1)}
+                disabled={!canZoomOut}
+                aria-label="Zoom out"
+                className="rounded-lg p-2 transition-colors hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <ZoomOut className="h-5 w-5 text-white" />
+              </button>
+              <button
+                onClick={() => setZoomIndex(0)}
+                aria-label="Reset zoom"
+                className="w-16 rounded-lg px-2 py-1 text-center text-sm text-white transition-colors hover:bg-gray-700"
+              >
+                {Math.round(zoom * 100)}%
+              </button>
+              <button
+                onClick={() => setZoomIndex((index) => index + 1)}
+                disabled={!canZoomIn}
+                aria-label="Zoom in"
+                className="rounded-lg p-2 transition-colors hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <ZoomIn className="h-5 w-5 text-white" />
+              </button>
+            </>
           )}
+          <button
+            onClick={toggleFullscreen}
+            aria-label={isFullscreen ? "Exit full screen" : "Enter full screen"}
+            className="rounded-lg p-2 transition-colors hover:bg-gray-700"
+          >
+            {isFullscreen ? (
+              <Minimize className="h-5 w-5 text-white" />
+            ) : (
+              <Maximize className="h-5 w-5 text-white" />
+            )}
+          </button>
         </div>
-        <div className="flex items-center gap-16">
-          <span className="text-sm font-medium text-white">{selectedItem.type.toUpperCase()}</span>
+        <div className="flex flex-1 justify-end">
           <button
             onClick={() => onSelectedIndexChange(null)}
             aria-label="Close media viewer"
@@ -63,89 +132,102 @@ const FullscreenMediaViewer: React.FC<FullscreenMediaViewerProps> = ({
         </div>
       </div>
 
-      <div className="absolute inset-0 flex items-center justify-center overflow-hidden px-16">
-        {selectedItem.type === "image" ? (
-          <img
-            src={selectedItem.url}
-            alt={selectedItem.description || selectedItem.name}
-            className="max-h-full max-w-full object-contain"
-          />
-        ) : selectedItem.type === "video" ? (
-          <video
-            src={selectedItem.url}
-            controls
-            autoPlay
-            className="max-h-full max-w-full"
-          />
-        ) : (
-          <div className="flex h-full w-full flex-col items-center justify-center">
-            {isPdfOrDocument(selectedItem.name) ? (
-              <>
-                <iframe
-                  src={`${selectedItem.url}#toolbar=0`}
-                  className="h-full w-full border-0"
-                  title={selectedItem.name}
-                />
-                <div className="absolute bottom-4 left-1/2 -translate-x-1/2 rounded bg-black/80 px-4 py-2">
+      <div className="relative flex min-h-0 flex-1">
+        <div className="absolute inset-0 flex overflow-auto px-16 py-4">
+          {isImage ? (
+            <img
+              src={selectedItem.url}
+              alt={selectedItem.description || selectedItem.name}
+              className={`m-auto object-contain ${zoom === 1 ? "max-h-full max-w-full" : "max-w-none"}`}
+              style={zoom === 1 ? undefined : { width: `${zoom * 100}%` }}
+            />
+          ) : selectedItem.type === "video" ? (
+            <video
+              src={selectedItem.url}
+              controls
+              autoPlay
+              className="m-auto max-h-full max-w-full"
+            />
+          ) : (
+            <div className="flex h-full w-full flex-col items-center justify-center">
+              {isPdfOrDocument(selectedItem.name) ? (
+                <>
+                  <iframe
+                    src={`${selectedItem.url}#toolbar=0`}
+                    className="h-full w-full border-0"
+                    title={selectedItem.name}
+                  />
+                  <div className="absolute bottom-4 left-1/2 -translate-x-1/2 rounded bg-black/80 px-4 py-2">
+                    <a
+                      href={selectedItem.url}
+                      download={selectedItem.name}
+                      className="inline-flex items-center gap-2 text-sheraton-gold transition-colors hover:text-white"
+                    >
+                      <Download className="h-4 w-4" />
+                      Download
+                    </a>
+                  </div>
+                </>
+              ) : (
+                <div className="text-center">
+                  <div className="mb-4 text-6xl">📄</div>
+                  <p className="mb-2 text-lg text-white">{selectedItem.name}</p>
+                  {!!selectedItem.fileSize && (
+                    <p className="mb-6 text-gray-400">
+                      {(selectedItem.fileSize / 1024 / 1024).toFixed(2)} MB
+                    </p>
+                  )}
                   <a
                     href={selectedItem.url}
-                    download={selectedItem.name}
-                    className="inline-flex items-center gap-2 text-sheraton-gold transition-colors hover:text-white"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-2 rounded-lg bg-sheraton-gold px-6 py-3 font-semibold text-sheraton-navy transition-all hover:bg-opacity-90"
                   >
                     <Download className="h-4 w-4" />
                     Download
                   </a>
                 </div>
-              </>
-            ) : (
-              <div className="text-center">
-                <div className="mb-4 text-6xl">📄</div>
-                <p className="mb-2 text-lg text-white">{selectedItem.name}</p>
-                {!!selectedItem.fileSize && (
-                  <p className="mb-6 text-gray-400">
-                    {(selectedItem.fileSize / 1024 / 1024).toFixed(2)} MB
-                  </p>
-                )}
-                <a
-                  href={selectedItem.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-2 rounded-lg bg-sheraton-gold px-6 py-3 font-semibold text-sheraton-navy transition-all hover:bg-opacity-90"
-                >
-                  <Download className="h-4 w-4" />
-                  Download
-                </a>
-              </div>
-            )}
-          </div>
-        )}
+              )}
+            </div>
+          )}
+        </div>
+
+        <div className="absolute left-4 top-1/2 z-10 -translate-y-1/2">
+          <span className="absolute bottom-full left-1/2 mb-6 -translate-x-1/2 whitespace-nowrap text-sm text-gray-400">
+            {selectedItem.footerLabel || `${selectedIndex + 1} / ${items.length}`}
+          </span>
+          <button
+            onClick={handlePrev}
+            disabled={selectedIndex === 0}
+            aria-label="Previous attachment"
+            className="rounded-lg p-2 transition-colors hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            <ChevronLeft className="h-6 w-6 text-white" />
+          </button>
+        </div>
+        <div className="absolute right-4 top-1/2 z-10 -translate-y-1/2">
+          <span className="absolute bottom-full left-1/2 mb-6 -translate-x-1/2 whitespace-nowrap text-sm text-gray-400">
+            {selectedItem.footerLabel || `${selectedIndex + 1} / ${items.length}`}
+          </span>
+          <button
+            onClick={handleNext}
+            disabled={selectedIndex === items.length - 1}
+            aria-label="Next attachment"
+            className="rounded-lg p-2 transition-colors hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            <ChevronRight className="h-6 w-6 text-white" />
+          </button>
+        </div>
       </div>
 
-      <div className="absolute left-4 top-1/2 -translate-y-1/2">
-        <span className="absolute bottom-full left-1/2 mb-6 -translate-x-1/2 whitespace-nowrap text-sm text-gray-400">
-          {selectedItem.footerLabel || `${selectedIndex + 1} / ${items.length}`}
-        </span>
-        <button
-          onClick={handlePrev}
-          disabled={selectedIndex === 0}
-          aria-label="Previous attachment"
-          className="rounded-lg p-2 transition-colors hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          <ChevronLeft className="h-6 w-6 text-white" />
-        </button>
-      </div>
-      <div className="absolute right-4 top-1/2 -translate-y-1/2">
-        <span className="absolute bottom-full left-1/2 mb-6 -translate-x-1/2 whitespace-nowrap text-sm text-gray-400">
-          {selectedItem.footerLabel || `${selectedIndex + 1} / ${items.length}`}
-        </span>
-        <button
-          onClick={handleNext}
-          disabled={selectedIndex === items.length - 1}
-          aria-label="Next attachment"
-          className="rounded-lg p-2 transition-colors hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          <ChevronRight className="h-6 w-6 text-white" />
-        </button>
+      <div className="flex items-center justify-between gap-4 border-t border-gray-700 bg-black p-4">
+        <div className="min-w-0 flex-1">
+          <p className="truncate font-medium text-white">{selectedItem.name}</p>
+          {selectedItem.description && (
+            <p className="truncate text-sm text-gray-400">{selectedItem.description}</p>
+          )}
+        </div>
+        <span className="shrink-0 text-sm font-medium text-white">{selectedItem.type.toUpperCase()}</span>
       </div>
     </div>
   );
