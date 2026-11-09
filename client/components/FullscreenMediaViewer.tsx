@@ -33,6 +33,9 @@ const FullscreenMediaViewer: React.FC<FullscreenMediaViewerProps> = ({
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [controlsVisible, setControlsVisible] = useState(true);
   const hideTimerRef = useRef<number | undefined>(undefined);
+  const mediaRef = useRef<HTMLDivElement>(null);
+  const [available, setAvailable] = useState<{ width: number; height: number } | null>(null);
+  const [naturalSize, setNaturalSize] = useState<{ url: string; width: number; height: number } | null>(null);
 
   useEffect(() => {
     setZoomIndex(0);
@@ -76,6 +79,25 @@ const FullscreenMediaViewer: React.FC<FullscreenMediaViewerProps> = ({
     };
   }, [isFullscreen]);
 
+  const isOpen = selectedIndex !== null;
+  useEffect(() => {
+    const el = mediaRef.current;
+    if (!el) return;
+
+    const measure = () => {
+      const style = getComputedStyle(el);
+      setAvailable({
+        width: el.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight),
+        height: el.clientHeight - parseFloat(style.paddingTop) - parseFloat(style.paddingBottom),
+      });
+    };
+
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [isOpen]);
+
   const selectedItem = selectedIndex === null ? null : items[selectedIndex];
 
   if (!selectedItem) return null;
@@ -84,6 +106,20 @@ const FullscreenMediaViewer: React.FC<FullscreenMediaViewerProps> = ({
   const zoom = ZOOM_STEPS[zoomIndex];
   const canZoomOut = zoomIndex > 0;
   const canZoomIn = zoomIndex < ZOOM_STEPS.length - 1;
+  const imageDisplaySize =
+    naturalSize && naturalSize.url === selectedItem.url && available
+      ? (() => {
+          const fit = Math.min(
+            available.width / naturalSize.width,
+            available.height / naturalSize.height,
+            1,
+          );
+          return {
+            width: naturalSize.width * fit * zoom,
+            height: naturalSize.height * fit * zoom,
+          };
+        })()
+      : null;
   const chromeClass = `transition-opacity duration-300 ${
     isFullscreen && !controlsVisible ? "pointer-events-none opacity-0" : "opacity-100"
   }`;
@@ -172,13 +208,20 @@ const FullscreenMediaViewer: React.FC<FullscreenMediaViewerProps> = ({
       </div>
 
       <div className="relative flex min-h-0 flex-1">
-        <div className={`absolute inset-0 flex overflow-auto px-16 ${isFullscreen ? "" : "py-4"}`}>
+        <div ref={mediaRef} className={`absolute inset-0 flex overflow-auto px-16 ${isFullscreen ? "" : "py-4"}`}>
           {isImage ? (
             <img
               src={selectedItem.url}
               alt={selectedItem.description || selectedItem.name}
-              className={`m-auto object-contain ${zoom === 1 ? "max-h-full max-w-full" : "max-w-none"}`}
-              style={zoom === 1 ? undefined : { width: `${zoom * 100}%` }}
+              onLoad={(event) =>
+                setNaturalSize({
+                  url: selectedItem.url,
+                  width: event.currentTarget.naturalWidth,
+                  height: event.currentTarget.naturalHeight,
+                })
+              }
+              className={imageDisplaySize ? "m-auto max-w-none" : "m-auto max-h-full max-w-full object-contain"}
+              style={imageDisplaySize ?? undefined}
             />
           ) : selectedItem.type === "video" ? (
             <video
