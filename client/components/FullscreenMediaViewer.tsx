@@ -43,8 +43,8 @@ const FullscreenMediaViewer: React.FC<FullscreenMediaViewerProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex flex-col bg-black/95">
-      <div className="flex items-center justify-between border-b border-gray-700 bg-black p-4">
+    <div className="fixed inset-0 z-50 bg-black/95">
+      <div className="absolute inset-x-0 top-0 z-10 flex items-center justify-between bg-gradient-to-b from-black/80 to-transparent p-4">
         <div className="flex-1">
           <p className="font-medium text-white">{selectedItem.type.toUpperCase()}</p>
           {selectedItem.description && (
@@ -65,7 +65,7 @@ const FullscreenMediaViewer: React.FC<FullscreenMediaViewerProps> = ({
         </div>
       </div>
 
-      <div className="flex flex-1 items-center justify-center overflow-hidden p-4">
+      <div className="absolute inset-0 flex items-center justify-center overflow-hidden px-16">
         {selectedItem.type === "image" ? (
           <img
             src={selectedItem.url}
@@ -123,7 +123,10 @@ const FullscreenMediaViewer: React.FC<FullscreenMediaViewerProps> = ({
         )}
       </div>
 
-      <div className="flex items-center justify-between border-t border-gray-700 bg-black p-4">
+      <div className="absolute left-4 top-1/2 -translate-y-1/2">
+        <span className="absolute bottom-full left-1/2 mb-2 -translate-x-1/2 whitespace-nowrap text-sm text-gray-400">
+          {selectedItem.footerLabel || `${selectedIndex + 1} / ${items.length}`}
+        </span>
         <button
           onClick={handlePrev}
           disabled={selectedIndex === 0}
@@ -132,11 +135,11 @@ const FullscreenMediaViewer: React.FC<FullscreenMediaViewerProps> = ({
         >
           <ChevronLeft className="h-6 w-6 text-white" />
         </button>
-        <div className="flex-1 text-center">
-          <p className="text-sm text-gray-400">
-            {selectedItem.footerLabel || `${selectedIndex + 1} / ${items.length}`}
-          </p>
-        </div>
+      </div>
+      <div className="absolute right-4 top-1/2 -translate-y-1/2">
+        <span className="absolute bottom-full left-1/2 mb-2 -translate-x-1/2 whitespace-nowrap text-sm text-gray-400">
+          {selectedItem.footerLabel || `${selectedIndex + 1} / ${items.length}`}
+        </span>
         <button
           onClick={handleNext}
           disabled={selectedIndex === items.length - 1}
