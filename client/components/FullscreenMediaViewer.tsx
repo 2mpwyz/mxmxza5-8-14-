@@ -44,7 +44,7 @@ const FullscreenMediaViewer: React.FC<FullscreenMediaViewerProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 bg-black/95">
-      <div className="absolute inset-x-0 top-0 z-10 flex items-center justify-between bg-gradient-to-b from-black/80 to-transparent p-4">
+      <div className="absolute inset-x-0 top-0 z-10 flex items-center justify-between p-4">
         <div className="min-w-0 flex-1">
           <p className="truncate font-medium text-white">{selectedItem.name}</p>
           {selectedItem.description && (
