@@ -88,7 +88,7 @@ const FullscreenMediaViewer: React.FC<FullscreenMediaViewerProps> = ({
           isFullscreen ? "absolute inset-x-0 top-0 z-20" : "border-b border-gray-700 bg-black"
         }`}
       >
-        <div className="flex-1" />
+        {!isFullscreen && <div className="flex-1" />}
         <div className="flex items-center gap-2">
           {isImage && (
             <>
