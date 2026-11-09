@@ -51,7 +51,7 @@ const FullscreenMediaViewer: React.FC<FullscreenMediaViewerProps> = ({
             <p className="truncate text-sm text-gray-400">{selectedItem.description}</p>
           )}
         </div>
-        <div className="flex items-center gap-6">
+        <div className="flex items-center gap-10">
           <span className="text-sm font-medium text-white">{selectedItem.type.toUpperCase()}</span>
           <button
             onClick={() => onSelectedIndexChange(null)}
@@ -122,7 +122,7 @@ const FullscreenMediaViewer: React.FC<FullscreenMediaViewerProps> = ({
       </div>
 
       <div className="absolute left-4 top-1/2 -translate-y-1/2">
-        <span className="absolute bottom-full left-1/2 mb-2 -translate-x-1/2 whitespace-nowrap text-sm text-gray-400">
+        <span className="absolute bottom-full left-1/2 mb-4 -translate-x-1/2 whitespace-nowrap text-sm text-gray-400">
           {selectedItem.footerLabel || `${selectedIndex + 1} / ${items.length}`}
         </span>
         <button
@@ -135,7 +135,7 @@ const FullscreenMediaViewer: React.FC<FullscreenMediaViewerProps> = ({
         </button>
       </div>
       <div className="absolute right-4 top-1/2 -translate-y-1/2">
-        <span className="absolute bottom-full left-1/2 mb-2 -translate-x-1/2 whitespace-nowrap text-sm text-gray-400">
+        <span className="absolute bottom-full left-1/2 mb-4 -translate-x-1/2 whitespace-nowrap text-sm text-gray-400">
           {selectedItem.footerLabel || `${selectedIndex + 1} / ${items.length}`}
         </span>
         <button
