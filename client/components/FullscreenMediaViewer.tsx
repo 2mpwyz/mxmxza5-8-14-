@@ -37,8 +37,12 @@ const FullscreenMediaViewer: React.FC<FullscreenMediaViewerProps> = ({
   }, [selectedIndex]);
 
   useEffect(() => {
+    if (selectedIndex === null) setIsFullscreen(false);
+  }, [selectedIndex]);
+
+  useEffect(() => {
     const handleFullscreenChange = () => {
-      setIsFullscreen(document.fullscreenElement === rootRef.current);
+      if (!document.fullscreenElement) setIsFullscreen(false);
     };
     document.addEventListener("fullscreenchange", handleFullscreenChange);
     return () => document.removeEventListener("fullscreenchange", handleFullscreenChange);
@@ -66,15 +70,15 @@ const FullscreenMediaViewer: React.FC<FullscreenMediaViewerProps> = ({
   };
 
   const toggleFullscreen = async () => {
-    try {
+    if (isFullscreen) {
+      setIsFullscreen(false);
       if (document.fullscreenElement) {
-        await document.exitFullscreen();
-      } else {
-        await rootRef.current?.requestFullscreen();
+        await document.exitFullscreen().catch((error) => console.error("Exit fullscreen failed", error));
       }
-    } catch (error) {
-      console.error("Fullscreen toggle failed", error);
+      return;
     }
+    setIsFullscreen(true);
+    await rootRef.current?.requestFullscreen().catch((error) => console.error("Enter fullscreen failed", error));
   };
 
   return (
@@ -137,7 +141,7 @@ const FullscreenMediaViewer: React.FC<FullscreenMediaViewerProps> = ({
       </div>
 
       <div className="relative flex min-h-0 flex-1">
-        <div className="absolute inset-0 flex overflow-auto px-16 py-4">
+        <div className={`absolute inset-0 flex overflow-auto px-16 ${isFullscreen ? "" : "py-4"}`}>
           {isImage ? (
             <img
               src={selectedItem.url}
