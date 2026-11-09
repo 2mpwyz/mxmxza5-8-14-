@@ -31,6 +31,8 @@ const FullscreenMediaViewer: React.FC<FullscreenMediaViewerProps> = ({
   const rootRef = useRef<HTMLDivElement>(null);
   const [zoomIndex, setZoomIndex] = useState(0);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [controlsVisible, setControlsVisible] = useState(true);
+  const hideTimerRef = useRef<number | undefined>(undefined);
 
   useEffect(() => {
     setZoomIndex(0);
@@ -48,6 +50,32 @@ const FullscreenMediaViewer: React.FC<FullscreenMediaViewerProps> = ({
     return () => document.removeEventListener("fullscreenchange", handleFullscreenChange);
   }, []);
 
+  useEffect(() => {
+    if (!isFullscreen) {
+      setControlsVisible(true);
+      return;
+    }
+
+    const root = rootRef.current;
+    const scheduleHide = () => {
+      window.clearTimeout(hideTimerRef.current);
+      hideTimerRef.current = window.setTimeout(() => setControlsVisible(false), 2500);
+    };
+    const revealControls = () => {
+      setControlsVisible(true);
+      scheduleHide();
+    };
+
+    scheduleHide();
+    root?.addEventListener("pointermove", revealControls);
+    root?.addEventListener("pointerdown", revealControls);
+    return () => {
+      root?.removeEventListener("pointermove", revealControls);
+      root?.removeEventListener("pointerdown", revealControls);
+      window.clearTimeout(hideTimerRef.current);
+    };
+  }, [isFullscreen]);
+
   const selectedItem = selectedIndex === null ? null : items[selectedIndex];
 
   if (!selectedItem) return null;
@@ -56,6 +84,9 @@ const FullscreenMediaViewer: React.FC<FullscreenMediaViewerProps> = ({
   const zoom = ZOOM_STEPS[zoomIndex];
   const canZoomOut = zoomIndex > 0;
   const canZoomIn = zoomIndex < ZOOM_STEPS.length - 1;
+  const chromeClass = `transition-opacity duration-300 ${
+    isFullscreen && !controlsVisible ? "pointer-events-none opacity-0" : "opacity-100"
+  }`;
 
   const handlePrev = () => {
     if (selectedIndex !== null && selectedIndex > 0) {
@@ -84,7 +115,7 @@ const FullscreenMediaViewer: React.FC<FullscreenMediaViewerProps> = ({
   return (
     <div ref={rootRef} className="fixed inset-0 z-50 flex flex-col bg-black/95">
       <div
-        className={`flex items-center justify-between p-4 ${
+        className={`flex items-center justify-between p-4 ${chromeClass} ${
           isFullscreen ? "absolute inset-x-0 top-0 z-20" : "border-b border-gray-700 bg-black"
         }`}
       >
@@ -200,7 +231,7 @@ const FullscreenMediaViewer: React.FC<FullscreenMediaViewerProps> = ({
           )}
         </div>
 
-        <div className="absolute left-4 top-1/2 z-10 -translate-y-1/2">
+        <div className={`absolute left-4 top-1/2 z-10 -translate-y-1/2 ${chromeClass}`}>
           <span className="absolute bottom-full left-1/2 mb-6 -translate-x-1/2 whitespace-nowrap text-sm text-gray-400">
             {selectedItem.footerLabel || `${selectedIndex + 1} / ${items.length}`}
           </span>
@@ -213,7 +244,7 @@ const FullscreenMediaViewer: React.FC<FullscreenMediaViewerProps> = ({
             <ChevronLeft className="h-6 w-6 text-white" />
           </button>
         </div>
-        <div className="absolute right-4 top-1/2 z-10 -translate-y-1/2">
+        <div className={`absolute right-4 top-1/2 z-10 -translate-y-1/2 ${chromeClass}`}>
           <span className="absolute bottom-full left-1/2 mb-6 -translate-x-1/2 whitespace-nowrap text-sm text-gray-400">
             {selectedItem.footerLabel || `${selectedIndex + 1} / ${items.length}`}
           </span>
@@ -229,7 +260,7 @@ const FullscreenMediaViewer: React.FC<FullscreenMediaViewerProps> = ({
       </div>
 
       <div
-        className={`flex items-center justify-between gap-4 p-4 ${
+        className={`flex items-center justify-between gap-4 p-4 ${chromeClass} ${
           isFullscreen ? "absolute inset-x-0 bottom-0 z-20" : "border-t border-gray-700 bg-black"
         }`}
       >
