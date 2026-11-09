@@ -79,7 +79,11 @@ const FullscreenMediaViewer: React.FC<FullscreenMediaViewerProps> = ({
 
   return (
     <div ref={rootRef} className="fixed inset-0 z-50 flex flex-col bg-black/95">
-      <div className="flex items-center justify-between border-b border-gray-700 bg-black p-4">
+      <div
+        className={`flex items-center justify-between p-4 ${
+          isFullscreen ? "absolute inset-x-0 top-0 z-20 bg-black/60" : "border-b border-gray-700 bg-black"
+        }`}
+      >
         <div className="flex-1" />
         <div className="flex items-center gap-2">
           {isImage && (
@@ -220,7 +224,11 @@ const FullscreenMediaViewer: React.FC<FullscreenMediaViewerProps> = ({
         </div>
       </div>
 
-      <div className="flex items-center justify-between gap-4 border-t border-gray-700 bg-black p-4">
+      <div
+        className={`flex items-center justify-between gap-4 p-4 ${
+          isFullscreen ? "absolute inset-x-0 bottom-0 z-20 bg-black/60" : "border-t border-gray-700 bg-black"
+        }`}
+      >
         <div className="min-w-0 flex-1">
           <p className="truncate font-medium text-white">{selectedItem.name}</p>
           {selectedItem.description && (
