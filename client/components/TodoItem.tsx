@@ -311,6 +311,15 @@ export const TodoItem: React.FC<TodoItemProps> = ({
               </p>
             </div>
           )}
+
+          {attachments && attachments.length > 0 && (
+            <div className="min-w-0">
+              <p className="text-xs font-semibold text-gray-600 dark:text-slate-300 uppercase mb-3">
+                📎 Attachments ({attachments.length})
+              </p>
+              <AttachmentList attachments={attachments} compact={true} />
+            </div>
+          )}
         </div>
 
         {status === "in_progress" && (
@@ -336,16 +345,6 @@ export const TodoItem: React.FC<TodoItemProps> = ({
                 style={{ width: `${progressPercentage}%` }}
               />
             </div>
-          </div>
-        )}
-
-        {/* Attachments Section */}
-        {attachments && attachments.length > 0 && (
-          <div className="pt-4 border-t border-gray-200 dark:border-slate-700">
-            <p className="text-xs font-semibold text-gray-600 dark:text-slate-300 uppercase mb-3">
-              📎 Attachments ({attachments.length})
-            </p>
-            <AttachmentList attachments={attachments} compact={true} />
           </div>
         )}
 
