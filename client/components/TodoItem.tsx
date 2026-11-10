@@ -214,7 +214,7 @@ export const TodoItem: React.FC<TodoItemProps> = ({
   const metadataTone = getMetadataTone(status);
 
   return (
-    <Card className={`${getStatusColor(status)} group rounded-xl`}>
+    <Card data-attachment-popup-container className={`${getStatusColor(status)} group rounded-xl`}>
       <CardHeader className="p-5 pb-4 sm:p-6 sm:pb-4">
         <div className="border-b border-slate-200 dark:border-slate-700 pb-4">
           <div className="mb-1 flex items-center justify-between gap-3">
@@ -317,7 +317,7 @@ export const TodoItem: React.FC<TodoItemProps> = ({
               <p className="text-xs font-semibold text-gray-600 dark:text-slate-300 uppercase mb-3">
                 📎 Attachments ({attachments.length})
               </p>
-              <AttachmentList attachments={attachments} compact={true} />
+              <AttachmentList attachments={attachments} compact={true} popupAlignment="container" />
             </div>
           )}
         </div>
