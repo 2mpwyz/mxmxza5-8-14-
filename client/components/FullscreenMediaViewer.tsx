@@ -5,6 +5,7 @@ export interface FullscreenMediaItem {
   url: string;
   download?: () => Promise<void>;
   type: string;
+  typeLabel?: string;
   name: string;
   description?: string | null;
   fileSize?: number;
@@ -102,9 +103,8 @@ const FullscreenMediaViewer: React.FC<FullscreenMediaViewerProps> = ({
 
   const isImage = selectedItem.type === "image";
   const isPdfItem = isPdf(selectedItem.name);
-  const pdfTypeLabel = isPdfItem && (
-    <span className="ml-12 text-sm font-medium text-white">{selectedItem.type.toUpperCase()}</span>
-  );
+  const typeLabel = (selectedItem.typeLabel ?? selectedItem.type).toUpperCase();
+  const pdfTypeLabel = isPdfItem && <span className="ml-12 text-sm font-medium text-white">{typeLabel}</span>;
   const isTouchPrimary = window.matchMedia("(pointer: coarse)").matches;
   const zoom = ZOOM_STEPS[zoomIndex];
   const canZoomOut = zoomIndex > 0;
@@ -336,7 +336,7 @@ const FullscreenMediaViewer: React.FC<FullscreenMediaViewerProps> = ({
             <p className="truncate text-sm text-gray-400">{selectedItem.description}</p>
           )}
         </div>
-        {!isPdfItem && <span className="shrink-0 text-sm font-medium text-white">{selectedItem.type.toUpperCase()}</span>}
+        {!isPdfItem && <span className="shrink-0 text-sm font-medium text-white">{typeLabel}</span>}
       </div>
       )}
     </div>
