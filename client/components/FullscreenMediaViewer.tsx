@@ -105,6 +105,7 @@ const FullscreenMediaViewer: React.FC<FullscreenMediaViewerProps> = ({
   if (!selectedItem) return null;
 
   const isImage = selectedItem.type === "image";
+  const isTouchPrimary = window.matchMedia("(pointer: coarse)").matches;
   const zoom = ZOOM_STEPS[zoomIndex];
   const canZoomOut = zoomIndex > 0;
   const canZoomIn = zoomIndex < ZOOM_STEPS.length - 1;
@@ -234,7 +235,32 @@ const FullscreenMediaViewer: React.FC<FullscreenMediaViewerProps> = ({
             />
           ) : (
             <div className="flex h-full w-full flex-col items-center justify-center">
-              {isPdfOrDocument(selectedItem.name) ? (
+              {isPdfOrDocument(selectedItem.name) && isTouchPrimary ? (
+                <div className="flex flex-col items-center gap-4 px-6 text-center">
+                  <p className="text-lg text-white">{selectedItem.name}</p>
+                  <a
+                    href={selectedItem.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-2 rounded-lg bg-sheraton-gold px-6 py-3 font-semibold text-sheraton-navy transition-all hover:bg-opacity-90"
+                  >
+                    <Download className="h-4 w-4" />
+                    {isPdf(selectedItem.name) ? "Open PDF" : "Download"}
+                  </a>
+                  {isPdf(selectedItem.name) && (
+                    <a
+                      href={selectedItem.url}
+                      download={selectedItem.name}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-2 rounded-lg px-6 py-3 text-sheraton-gold transition-colors hover:text-white"
+                    >
+                      <Download className="h-4 w-4" />
+                      Download
+                    </a>
+                  )}
+                </div>
+              ) : isPdfOrDocument(selectedItem.name) ? (
                 <>
                   <iframe
                     src={selectedItem.url}
