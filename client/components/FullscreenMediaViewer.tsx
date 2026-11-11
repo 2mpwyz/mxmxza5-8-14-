@@ -1,10 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
 import { ChevronLeft, ChevronRight, Download, Maximize, Minimize, X, ZoomIn, ZoomOut } from "lucide-react";
-import { Viewer, Worker } from "@react-pdf-viewer/core";
-import { defaultLayoutPlugin } from "@react-pdf-viewer/default-layout";
-import "@react-pdf-viewer/core/lib/styles/index.css";
-import "@react-pdf-viewer/default-layout/lib/styles/index.css";
-import pdfWorkerUrl from "pdfjs-dist/build/pdf.worker.min.js?url";
 
 export interface FullscreenMediaItem {
   url: string;
@@ -105,7 +100,6 @@ const FullscreenMediaViewer: React.FC<FullscreenMediaViewerProps> = ({
     return () => observer.disconnect();
   }, [isOpen]);
 
-  const defaultLayout = defaultLayoutPlugin();
   const selectedItem = selectedIndex === null ? null : items[selectedIndex];
 
   if (!selectedItem) return null;
@@ -240,13 +234,7 @@ const FullscreenMediaViewer: React.FC<FullscreenMediaViewerProps> = ({
             />
           ) : (
             <div className="flex h-full w-full flex-col items-center justify-center">
-              {isPdf(selectedItem.name) ? (
-                <Worker workerUrl={pdfWorkerUrl}>
-                  <div className="h-full w-full">
-                    <Viewer fileUrl={selectedItem.url} plugins={[defaultLayout]} />
-                  </div>
-                </Worker>
-              ) : isPdfOrDocument(selectedItem.name) ? (
+              {isPdfOrDocument(selectedItem.name) ? (
                 <>
                   <iframe
                     src={selectedItem.url}
@@ -257,10 +245,12 @@ const FullscreenMediaViewer: React.FC<FullscreenMediaViewerProps> = ({
                     <a
                       href={selectedItem.url}
                       download={selectedItem.name}
+                      target="_blank"
+                      rel="noopener noreferrer"
                       className="inline-flex items-center gap-2 text-sheraton-gold transition-colors hover:text-white"
                     >
                       <Download className="h-4 w-4" />
-                      Download
+                      {isPdf(selectedItem.name) ? "Open PDF" : "Download"}
                     </a>
                   </div>
                 </>
