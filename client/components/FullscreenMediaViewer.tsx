@@ -101,6 +101,7 @@ const FullscreenMediaViewer: React.FC<FullscreenMediaViewerProps> = ({
   if (!selectedItem) return null;
 
   const isImage = selectedItem.type === "image";
+  const isPdfItem = isPdf(selectedItem.name);
   const isTouchPrimary = window.matchMedia("(pointer: coarse)").matches;
   const zoom = ZOOM_STEPS[zoomIndex];
   const canZoomOut = zoomIndex > 0;
@@ -194,6 +195,7 @@ const FullscreenMediaViewer: React.FC<FullscreenMediaViewerProps> = ({
               </button>
             </>
           )}
+          {isPdfItem && <span className="text-sm font-medium text-white">{selectedItem.type.toUpperCase()}</span>}
           <button
             onClick={toggleFullscreen}
             aria-label={isFullscreen ? "Exit full screen" : "Enter full screen"}
@@ -205,6 +207,17 @@ const FullscreenMediaViewer: React.FC<FullscreenMediaViewerProps> = ({
               <Maximize className="h-5 w-5 text-white" />
             )}
           </button>
+          {isPdfItem && !isTouchPrimary && (
+            <a
+              href={selectedItem.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-2 rounded-lg p-2 text-sm text-sheraton-gold transition-colors hover:bg-gray-700"
+            >
+              <ExternalLink className="h-4 w-4" />
+              Open PDF
+            </a>
+          )}
         </div>
         <div className="flex flex-1 justify-end">
           <button
@@ -263,17 +276,6 @@ const FullscreenMediaViewer: React.FC<FullscreenMediaViewerProps> = ({
                     className="h-full w-full border-0"
                     title={selectedItem.name}
                   />
-                  <div className="absolute bottom-4 left-1/2 -translate-x-1/2 rounded bg-black/80 px-4 py-2">
-                    <a
-                      href={selectedItem.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center gap-2 text-sheraton-gold transition-colors hover:text-white"
-                    >
-                      <ExternalLink className="h-4 w-4" />
-                      Open PDF
-                    </a>
-                  </div>
                 </>
               ) : (
                 <div className="text-center">
@@ -319,19 +321,21 @@ const FullscreenMediaViewer: React.FC<FullscreenMediaViewerProps> = ({
         </div>
       </div>
 
+      {(!isPdfItem || selectedItem.description) && (
       <div
         className={`flex items-center justify-between gap-4 p-4 ${chromeClass} ${
           isFullscreen ? "absolute inset-x-0 bottom-0 z-20" : "border-t border-gray-700 bg-black"
         }`}
       >
         <div className="min-w-0 flex-1">
-          <p className="truncate font-medium text-white">{selectedItem.name}</p>
+          {!isPdfItem && <p className="truncate font-medium text-white">{selectedItem.name}</p>}
           {selectedItem.description && (
             <p className="truncate text-sm text-gray-400">{selectedItem.description}</p>
           )}
         </div>
-        <span className="shrink-0 text-sm font-medium text-white">{selectedItem.type.toUpperCase()}</span>
+        {!isPdfItem && <span className="shrink-0 text-sm font-medium text-white">{selectedItem.type.toUpperCase()}</span>}
       </div>
+      )}
     </div>
   );
 };
