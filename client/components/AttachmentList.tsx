@@ -185,13 +185,16 @@ const AttachmentList: React.FC<AttachmentListProps> = ({ attachments, compact = 
     return attachment.fileType || attachment.type;
   };
 
-  const previewItems: FullscreenMediaItem[] = otherAttachments.map((attachment) => ({
-    url: getFileUrlFromAttachment(attachment),
-    attachmentId: attachment.attachmentId || attachment.id,
-    type: getFileTypeFromAttachment(attachment) || "file",
-    name: getFileNameFromAttachment(attachment),
-    fileSize: getFileSizeFromAttachment(attachment),
-  }));
+  const previewItems: FullscreenMediaItem[] = otherAttachments.map((attachment) => {
+    const attachmentId = attachment.attachmentId || attachment.id;
+    return {
+      url: getFileUrlFromAttachment(attachment),
+      download: attachmentId ? () => downloadAttachment(attachmentId) : undefined,
+      type: getFileTypeFromAttachment(attachment) || "file",
+      name: getFileNameFromAttachment(attachment),
+      fileSize: getFileSizeFromAttachment(attachment),
+    };
+  });
 
   const handleDownload = (attachment: Attachment) => {
     const attachmentId = attachment.attachmentId || attachment.id;

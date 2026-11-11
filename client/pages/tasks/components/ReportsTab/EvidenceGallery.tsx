@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { TaskEvidenceSubmission } from "../../../../lib/supabase";
-import FullscreenMediaViewer from "../../../../components/FullscreenMediaViewer";
+import FullscreenMediaViewer, { type FullscreenMediaItem } from "../../../../components/FullscreenMediaViewer";
+import { downloadAttachment } from "../../../../lib/attachmentDownload";
 
 interface EvidenceGalleryProps {
   evidenceSubmissions: TaskEvidenceSubmission[];
@@ -8,15 +9,18 @@ interface EvidenceGalleryProps {
 
 const EvidenceGallery: React.FC<EvidenceGalleryProps> = ({ evidenceSubmissions }) => {
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
-  const viewerItems = evidenceSubmissions.map((evidence) => ({
-    url: evidence.attachments?.b2_url || "",
-    attachmentId: evidence.attachment_id,
-    type: evidence.attachments?.file_type || "file",
-    name: evidence.attachments?.original_name || "Evidence",
-    description: evidence.description,
-    fileSize: evidence.attachments?.file_size,
-    footerLabel: `Submitted: ${new Date(evidence.submitted_at).toLocaleString()}`,
-  }));
+  const viewerItems: FullscreenMediaItem[] = evidenceSubmissions.map((evidence) => {
+    const attachmentId = evidence.attachment_id;
+    return {
+      url: evidence.attachments?.b2_url || "",
+      download: attachmentId ? () => downloadAttachment(attachmentId) : undefined,
+      type: evidence.attachments?.file_type || "file",
+      name: evidence.attachments?.original_name || "Evidence",
+      description: evidence.description,
+      fileSize: evidence.attachments?.file_size,
+      footerLabel: `Submitted: ${new Date(evidence.submitted_at).toLocaleString()}`,
+    };
+  });
 
   // Separate evidence by type for better organization
   const images = evidenceSubmissions.filter((e) => e.attachments?.file_type === "image");

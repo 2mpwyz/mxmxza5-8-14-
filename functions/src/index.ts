@@ -321,6 +321,21 @@ async function updateDeliveryAudit(client: ReturnType<typeof supabase>, correlat
 
 const runtimeSecrets = ["SUPABASE_SERVICE_ROLE_KEY", "SUPABASE_WEBHOOK_SECRET", "B2_KEY_ID", "B2_APPLICATION_KEY", "BREVO_API_KEY"];
 
+const signDownloadUrl = (storageKey: string, originalName: string): Promise<string> => {
+  const filename = originalName.split(/[\\/]/).pop()!
+    .replace(/[\r\n";]/g, "_") || "attachment";
+  const fallbackFilename = filename.replace(/[^\x20-\x7E]/g, "_");
+  const encodedFilename = encodeURIComponent(filename).replace(/[!'()*]/g, (character) =>
+    `%${character.charCodeAt(0).toString(16).toUpperCase()}`,
+  );
+  const command = new GetObjectCommand({
+    Bucket: bucket(),
+    Key: storageKey,
+    ResponseContentDisposition: `attachment; filename="${fallbackFilename}"; filename*=UTF-8''${encodedFilename}`,
+  });
+  return getSignedUrl(b2(), command, { expiresIn: 300 });
+};
+
 export const createAttachmentDownloadUrl = onRequest({
   region: "us-central1",
   cors: true,
@@ -393,21 +408,60 @@ export const createAttachmentDownloadUrl = onRequest({
       return;
     }
 
-    const filename = (attachment.original_name || attachment.filename).split(/[\\/]/).pop()!
-      .replace(/[\r\n";]/g, "_") || "attachment";
-    const fallbackFilename = filename.replace(/[^\x20-\x7E]/g, "_");
-    const encodedFilename = encodeURIComponent(filename).replace(/[!'()*]/g, (character) =>
-      `%${character.charCodeAt(0).toString(16).toUpperCase()}`,
-    );
-    const command = new GetObjectCommand({
-      Bucket: bucket(),
-      Key: attachment.filename,
-      ResponseContentDisposition: `attachment; filename="${fallbackFilename}"; filename*=UTF-8''${encodedFilename}`,
-    });
-    const url = await getSignedUrl(b2(), command, { expiresIn: 300 });
+    const url = await signDownloadUrl(attachment.filename, attachment.original_name || attachment.filename);
     response.set("Cache-Control", "private, no-store").json({ url });
   } catch {
     response.status(500).json({ error: "Could not prepare attachment download" });
+  }
+});
+
+export const createBooksDocumentDownloadUrl = onRequest({
+  region: "us-central1",
+  cors: true,
+  secrets: ["B2_KEY_ID", "B2_APPLICATION_KEY"],
+}, async (request, response) => {
+  if (request.method !== "POST") {
+    response.status(405).json({ error: "POST required" });
+    return;
+  }
+
+  const authorization = request.header("authorization");
+  const token = authorization?.match(/^Bearer\s+(.+)$/i)?.[1];
+  const anonKey = request.header("apikey");
+  const documentUrl = request.body?.documentUrl;
+  const publicBase = process.env.B2_PUBLIC_URL?.replace(/\/$/, "");
+  if (!token || !anonKey || !publicBase || typeof documentUrl !== "string" || !documentUrl.startsWith(`${publicBase}/`)) {
+    response.status(401).json({ error: "An authenticated Books document is required" });
+    return;
+  }
+
+  try {
+    const userClient = createClient(required("SUPABASE_URL"), anonKey, {
+      auth: { autoRefreshToken: false, persistSession: false },
+      global: { headers: { Authorization: authorization } },
+    });
+    const { data: { user }, error: authError } = await userClient.auth.getUser(token);
+    if (authError || !user) {
+      response.status(401).json({ error: "Your sign-in session has expired" });
+      return;
+    }
+
+    const [invoiceMatches, receiptMatches, expenseReceiptMatches] = await Promise.all([
+      userClient.from("books_invoices").select("id").eq("invoice_url", documentUrl).limit(1),
+      userClient.from("books_invoices").select("id").eq("receipt_url", documentUrl).limit(1),
+      userClient.from("books_expenses").select("id").eq("receipt_url", documentUrl).limit(1),
+    ]);
+    const canDownload = [invoiceMatches, receiptMatches, expenseReceiptMatches].some(({ data }) => data?.length);
+    if (!canDownload) {
+      response.status(403).json({ error: "You cannot access this document" });
+      return;
+    }
+
+    const storageKey = documentUrl.slice(publicBase.length + 1);
+    const url = await signDownloadUrl(storageKey, storageKey);
+    response.set("Cache-Control", "private, no-store").json({ url });
+  } catch {
+    response.status(500).json({ error: "Could not prepare document download" });
   }
 });
 

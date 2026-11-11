@@ -1,10 +1,9 @@
 import React, { useEffect, useRef, useState } from "react";
-import { ChevronLeft, ChevronRight, Download, Maximize, Minimize, X, ZoomIn, ZoomOut } from "lucide-react";
-import { downloadAttachment } from "../lib/attachmentDownload";
+import { ChevronLeft, ChevronRight, Download, ExternalLink, Maximize, Minimize, X, ZoomIn, ZoomOut } from "lucide-react";
 
 export interface FullscreenMediaItem {
   url: string;
-  attachmentId?: string;
+  download?: () => Promise<void>;
   type: string;
   name: string;
   description?: string | null;
@@ -125,27 +124,13 @@ const FullscreenMediaViewer: React.FC<FullscreenMediaViewerProps> = ({
   }`;
 
   const renderDownloadControl = (className: string) => {
-    const attachmentId = selectedItem.attachmentId;
-    const content = (
-      <>
+    const download = selectedItem.download;
+    if (!download) return null;
+    return (
+      <button type="button" onClick={() => void download()} className={className}>
         <Download className="h-4 w-4" />
         Download
-      </>
-    );
-    return attachmentId ? (
-      <button type="button" onClick={() => void downloadAttachment(attachmentId)} className={className}>
-        {content}
       </button>
-    ) : (
-      <a
-        href={selectedItem.url}
-        download={selectedItem.name}
-        target="_blank"
-        rel="noopener noreferrer"
-        className={className}
-      >
-        {content}
-      </a>
     );
   };
 
@@ -266,7 +251,7 @@ const FullscreenMediaViewer: React.FC<FullscreenMediaViewerProps> = ({
                     rel="noopener noreferrer"
                     className="inline-flex items-center gap-2 rounded-lg bg-sheraton-gold px-6 py-3 font-semibold text-sheraton-navy transition-all hover:bg-opacity-90"
                   >
-                    <Download className="h-4 w-4" />
+                    <ExternalLink className="h-4 w-4" />
                     Open PDF
                   </a>
                   {renderDownloadControl("inline-flex items-center gap-2 rounded-lg px-6 py-3 text-sheraton-gold transition-colors hover:text-white")}
@@ -278,17 +263,17 @@ const FullscreenMediaViewer: React.FC<FullscreenMediaViewerProps> = ({
                     className="h-full w-full border-0"
                     title={selectedItem.name}
                   />
-                  <div className="absolute bottom-4 left-1/2 -translate-x-1/2 rounded bg-black/80 px-4 py-2">
+                  <div className="absolute bottom-4 left-1/2 flex -translate-x-1/2 items-center gap-6 rounded bg-black/80 px-4 py-2">
                     <a
                       href={selectedItem.url}
-                      download={selectedItem.name}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="inline-flex items-center gap-2 text-sheraton-gold transition-colors hover:text-white"
                     >
-                      <Download className="h-4 w-4" />
+                      <ExternalLink className="h-4 w-4" />
                       Open PDF
                     </a>
+                    {renderDownloadControl("inline-flex items-center gap-2 text-sheraton-gold transition-colors hover:text-white")}
                   </div>
                 </>
               ) : (

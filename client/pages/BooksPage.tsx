@@ -1,6 +1,7 @@
 import { FormEvent, useEffect, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { supabase } from "../lib/supabase";
+import { downloadBooksDocument } from "../lib/attachmentDownload";
 import { Badge } from "../components/ui/badge";
 import { Button } from "../components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
@@ -76,7 +77,7 @@ const documentItemFromUrl = (url: string, label: string): FullscreenMediaItem =>
   const name = lastSegment.includes(".") ? lastSegment : label;
   const extension = name.split(".").pop()?.toLowerCase() ?? "";
   const type = /^(png|jpe?g|gif|webp|svg|bmp)$/.test(extension) ? "image" : /^(mp4|webm|mov)$/.test(extension) ? "video" : "file";
-  return { url, type, name };
+  return { url, type, name, download: () => downloadBooksDocument(url) };
 };
 
 const BooksPage = () => {
