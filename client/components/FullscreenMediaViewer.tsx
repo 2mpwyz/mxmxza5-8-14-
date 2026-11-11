@@ -20,11 +20,6 @@ const ZOOM_STEPS = [1, 1.25, 1.5, 2, 2.5, 3];
 
 const isPdf = (filename: string): boolean => filename.toLowerCase().endsWith(".pdf");
 
-const isPdfOrDocument = (filename: string): boolean => {
-  const lowerName = filename.toLowerCase();
-  return lowerName.endsWith(".pdf") || lowerName.endsWith(".doc") || lowerName.endsWith(".docx");
-};
-
 const FullscreenMediaViewer: React.FC<FullscreenMediaViewerProps> = ({
   items,
   selectedIndex,
@@ -235,7 +230,7 @@ const FullscreenMediaViewer: React.FC<FullscreenMediaViewerProps> = ({
             />
           ) : (
             <div className="flex h-full w-full flex-col items-center justify-center">
-              {isPdfOrDocument(selectedItem.name) && isTouchPrimary ? (
+              {isPdf(selectedItem.name) && isTouchPrimary ? (
                 <div className="flex flex-col items-center gap-4 px-6 text-center">
                   <p className="text-lg text-white">{selectedItem.name}</p>
                   <a
@@ -245,22 +240,20 @@ const FullscreenMediaViewer: React.FC<FullscreenMediaViewerProps> = ({
                     className="inline-flex items-center gap-2 rounded-lg bg-sheraton-gold px-6 py-3 font-semibold text-sheraton-navy transition-all hover:bg-opacity-90"
                   >
                     <Download className="h-4 w-4" />
-                    {isPdf(selectedItem.name) ? "Open PDF" : "Download"}
+                    Open PDF
                   </a>
-                  {isPdf(selectedItem.name) && (
-                    <a
-                      href={selectedItem.url}
-                      download={selectedItem.name}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center gap-2 rounded-lg px-6 py-3 text-sheraton-gold transition-colors hover:text-white"
-                    >
-                      <Download className="h-4 w-4" />
-                      Download
-                    </a>
-                  )}
+                  <a
+                    href={selectedItem.url}
+                    download={selectedItem.name}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-2 rounded-lg px-6 py-3 text-sheraton-gold transition-colors hover:text-white"
+                  >
+                    <Download className="h-4 w-4" />
+                    Download
+                  </a>
                 </div>
-              ) : isPdfOrDocument(selectedItem.name) ? (
+              ) : isPdf(selectedItem.name) ? (
                 <>
                   <iframe
                     src={selectedItem.url}
@@ -276,7 +269,7 @@ const FullscreenMediaViewer: React.FC<FullscreenMediaViewerProps> = ({
                       className="inline-flex items-center gap-2 text-sheraton-gold transition-colors hover:text-white"
                     >
                       <Download className="h-4 w-4" />
-                      {isPdf(selectedItem.name) ? "Open PDF" : "Download"}
+                      Open PDF
                     </a>
                   </div>
                 </>
