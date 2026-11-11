@@ -103,7 +103,7 @@ const FullscreenMediaViewer: React.FC<FullscreenMediaViewerProps> = ({
   const isImage = selectedItem.type === "image";
   const isPdfItem = isPdf(selectedItem.name);
   const pdfTypeLabel = isPdfItem && (
-    <span className="text-sm font-medium text-white">{selectedItem.type.toUpperCase()}</span>
+    <span className="ml-12 text-sm font-medium text-white">{selectedItem.type.toUpperCase()}</span>
   );
   const isTouchPrimary = window.matchMedia("(pointer: coarse)").matches;
   const zoom = ZOOM_STEPS[zoomIndex];
