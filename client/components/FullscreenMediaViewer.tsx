@@ -102,6 +102,9 @@ const FullscreenMediaViewer: React.FC<FullscreenMediaViewerProps> = ({
 
   const isImage = selectedItem.type === "image";
   const isPdfItem = isPdf(selectedItem.name);
+  const pdfTypeLabel = isPdfItem && (
+    <span className="text-sm font-medium text-white">{selectedItem.type.toUpperCase()}</span>
+  );
   const isTouchPrimary = window.matchMedia("(pointer: coarse)").matches;
   const zoom = ZOOM_STEPS[zoomIndex];
   const canZoomOut = zoomIndex > 0;
@@ -166,8 +169,9 @@ const FullscreenMediaViewer: React.FC<FullscreenMediaViewerProps> = ({
           isFullscreen ? "absolute inset-x-0 top-0 z-20" : "border-b border-gray-700 bg-black"
         }`}
       >
-        {!isFullscreen && <div className="flex-1" />}
+        {!isFullscreen && <div className="flex flex-1 justify-start">{pdfTypeLabel}</div>}
         <div className="flex items-center gap-2">
+          {isFullscreen && pdfTypeLabel}
           {isImage && (
             <>
               <button
@@ -195,7 +199,6 @@ const FullscreenMediaViewer: React.FC<FullscreenMediaViewerProps> = ({
               </button>
             </>
           )}
-          {isPdfItem && <span className="text-sm font-medium text-white">{selectedItem.type.toUpperCase()}</span>}
           <button
             onClick={toggleFullscreen}
             aria-label={isFullscreen ? "Exit full screen" : "Enter full screen"}
