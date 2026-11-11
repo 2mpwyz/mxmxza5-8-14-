@@ -1,5 +1,10 @@
 import React, { useEffect, useRef, useState } from "react";
 import { ChevronLeft, ChevronRight, Download, Maximize, Minimize, X, ZoomIn, ZoomOut } from "lucide-react";
+import { Viewer, Worker } from "@react-pdf-viewer/core";
+import { defaultLayoutPlugin } from "@react-pdf-viewer/default-layout";
+import "@react-pdf-viewer/core/lib/styles/index.css";
+import "@react-pdf-viewer/default-layout/lib/styles/index.css";
+import pdfWorkerUrl from "pdfjs-dist/build/pdf.worker.min.js?url";
 
 export interface FullscreenMediaItem {
   url: string;
@@ -17,6 +22,8 @@ interface FullscreenMediaViewerProps {
 }
 
 const ZOOM_STEPS = [1, 1.25, 1.5, 2, 2.5, 3];
+
+const isPdf = (filename: string): boolean => filename.toLowerCase().endsWith(".pdf");
 
 const isPdfOrDocument = (filename: string): boolean => {
   const lowerName = filename.toLowerCase();
@@ -98,6 +105,7 @@ const FullscreenMediaViewer: React.FC<FullscreenMediaViewerProps> = ({
     return () => observer.disconnect();
   }, [isOpen]);
 
+  const defaultLayout = defaultLayoutPlugin();
   const selectedItem = selectedIndex === null ? null : items[selectedIndex];
 
   if (!selectedItem) return null;
@@ -232,10 +240,16 @@ const FullscreenMediaViewer: React.FC<FullscreenMediaViewerProps> = ({
             />
           ) : (
             <div className="flex h-full w-full flex-col items-center justify-center">
-              {isPdfOrDocument(selectedItem.name) ? (
+              {isPdf(selectedItem.name) ? (
+                <Worker workerUrl={pdfWorkerUrl}>
+                  <div className="h-full w-full">
+                    <Viewer fileUrl={selectedItem.url} plugins={[defaultLayout]} />
+                  </div>
+                </Worker>
+              ) : isPdfOrDocument(selectedItem.name) ? (
                 <>
                   <iframe
-                    src={`${selectedItem.url}#toolbar=0`}
+                    src={selectedItem.url}
                     className="h-full w-full border-0"
                     title={selectedItem.name}
                   />
