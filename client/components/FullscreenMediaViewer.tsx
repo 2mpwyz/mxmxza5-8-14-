@@ -165,12 +165,12 @@ const FullscreenMediaViewer: React.FC<FullscreenMediaViewerProps> = ({
   return (
     <div ref={rootRef} className="fixed inset-0 z-50 flex flex-col bg-black/95">
       <div
-        className={`flex items-center justify-between p-4 ${chromeClass} ${
+        className={`flex items-center justify-between gap-4 p-4 ${chromeClass} ${
           isFullscreen ? "absolute inset-x-0 top-0 z-20" : "border-b border-gray-700 bg-black"
         }`}
       >
         {!isFullscreen && <div className="flex flex-1 justify-start">{pdfTypeLabel}</div>}
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-4 sm:gap-2">
           {isFullscreen && pdfTypeLabel}
           {isImage && (
             <>
@@ -215,10 +215,12 @@ const FullscreenMediaViewer: React.FC<FullscreenMediaViewerProps> = ({
               href={selectedItem.url}
               target="_blank"
               rel="noopener noreferrer"
+              aria-label="Open PDF in a new tab"
               className="inline-flex items-center gap-2 rounded-lg p-2 text-sm text-sheraton-gold transition-colors hover:bg-gray-700"
             >
               <ExternalLink className="h-4 w-4" />
-              Open PDF
+              <span className="hidden sm:inline">Open PDF</span>
+              <span className="sm:hidden">PDF</span>
             </a>
           )}
         </div>
