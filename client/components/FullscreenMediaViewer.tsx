@@ -263,7 +263,7 @@ const FullscreenMediaViewer: React.FC<FullscreenMediaViewerProps> = ({
                     className="h-full w-full border-0"
                     title={selectedItem.name}
                   />
-                  <div className="absolute bottom-4 left-1/2 flex -translate-x-1/2 items-center gap-6 rounded bg-black/80 px-4 py-2">
+                  <div className="absolute bottom-4 left-1/2 -translate-x-1/2 rounded bg-black/80 px-4 py-2">
                     <a
                       href={selectedItem.url}
                       target="_blank"
@@ -273,7 +273,6 @@ const FullscreenMediaViewer: React.FC<FullscreenMediaViewerProps> = ({
                       <ExternalLink className="h-4 w-4" />
                       Open PDF
                     </a>
-                    {renderDownloadControl("inline-flex items-center gap-2 text-sheraton-gold transition-colors hover:text-white")}
                   </div>
                 </>
               ) : (
