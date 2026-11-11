@@ -14,8 +14,7 @@ import { Button } from "./ui/button";
 import { Badge } from "./ui/badge";
 import MuxVideoPlayer from "./MuxVideoPlayer";
 import FullscreenMediaViewer, { type FullscreenMediaItem } from "./FullscreenMediaViewer";
-import { toast } from "../hooks/use-toast";
-import { supabase } from "../lib/supabase";
+import { downloadAttachment } from "../lib/attachmentDownload";
 
 interface Attachment {
   id?: string;
@@ -188,39 +187,15 @@ const AttachmentList: React.FC<AttachmentListProps> = ({ attachments, compact = 
 
   const previewItems: FullscreenMediaItem[] = otherAttachments.map((attachment) => ({
     url: getFileUrlFromAttachment(attachment),
+    attachmentId: attachment.attachmentId || attachment.id,
     type: getFileTypeFromAttachment(attachment) || "file",
     name: getFileNameFromAttachment(attachment),
     fileSize: getFileSizeFromAttachment(attachment),
   }));
 
-  const handleDownload = async (attachment: Attachment) => {
+  const handleDownload = (attachment: Attachment) => {
     const attachmentId = attachment.attachmentId || attachment.id;
-    if (!attachmentId) return;
-
-    try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session?.access_token) throw new Error("Authentication is required");
-
-      const response = await fetch("https://us-central1-speshio.cloudfunctions.net/createAttachmentDownloadUrl", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          apikey: import.meta.env.VITE_SUPABASE_ANON_KEY,
-          Authorization: `Bearer ${session.access_token}`,
-        },
-        body: JSON.stringify({ attachmentId }),
-      });
-      if (!response.ok) throw new Error("Download request failed");
-
-      const { url } = await response.json() as { url: string };
-      window.location.assign(url);
-    } catch {
-      toast({
-        title: "Download failed",
-        description: "Unable to download this attachment.",
-        variant: "destructive",
-      });
-    }
+    if (attachmentId) void downloadAttachment(attachmentId);
   };
 
   if (compact) {

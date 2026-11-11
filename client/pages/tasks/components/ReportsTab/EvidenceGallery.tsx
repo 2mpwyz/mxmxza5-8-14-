@@ -10,6 +10,7 @@ const EvidenceGallery: React.FC<EvidenceGalleryProps> = ({ evidenceSubmissions }
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
   const viewerItems = evidenceSubmissions.map((evidence) => ({
     url: evidence.attachments?.b2_url || "",
+    attachmentId: evidence.attachment_id,
     type: evidence.attachments?.file_type || "file",
     name: evidence.attachments?.original_name || "Evidence",
     description: evidence.description,
