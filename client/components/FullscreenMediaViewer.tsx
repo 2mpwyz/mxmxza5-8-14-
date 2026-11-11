@@ -105,6 +105,18 @@ const FullscreenMediaViewer: React.FC<FullscreenMediaViewerProps> = ({
   const isPdfItem = isPdf(selectedItem.name);
   const typeLabel = (selectedItem.typeLabel ?? selectedItem.type).toUpperCase();
   const pdfTypeLabel = isPdfItem && <span className="ml-12 text-sm font-medium text-white">{typeLabel}</span>;
+  const renderOpenPdfLink = (className: string, label: string) => (
+    <a
+      href={selectedItem.url}
+      target="_blank"
+      rel="noopener noreferrer"
+      aria-label="Open PDF in a new tab"
+      className={`items-center gap-2 rounded-lg p-2 text-sm text-sheraton-gold transition-colors hover:bg-gray-700 ${className}`}
+    >
+      <ExternalLink className="h-4 w-4" />
+      {label}
+    </a>
+  );
   const isTouchPrimary = window.matchMedia("(pointer: coarse)").matches;
   const zoom = ZOOM_STEPS[zoomIndex];
   const canZoomOut = zoomIndex > 0;
@@ -210,21 +222,10 @@ const FullscreenMediaViewer: React.FC<FullscreenMediaViewerProps> = ({
               <Maximize className="h-5 w-5 text-white" />
             )}
           </button>
-          {isPdfItem && !isTouchPrimary && (
-            <a
-              href={selectedItem.url}
-              target="_blank"
-              rel="noopener noreferrer"
-              aria-label="Open PDF in a new tab"
-              className="inline-flex items-center gap-2 rounded-lg p-2 text-sm text-sheraton-gold transition-colors hover:bg-gray-700"
-            >
-              <ExternalLink className="h-4 w-4" />
-              <span className="hidden sm:inline">Open PDF</span>
-              <span className="sm:hidden">PDF</span>
-            </a>
-          )}
+          {isPdfItem && !isTouchPrimary && renderOpenPdfLink("hidden sm:inline-flex", "Open PDF")}
         </div>
-        <div className="flex flex-1 justify-end">
+        <div className="flex flex-1 items-center justify-end">
+          {isPdfItem && !isTouchPrimary && renderOpenPdfLink("inline-flex sm:hidden", "PDF")}
           <button
             onClick={() => onSelectedIndexChange(null)}
             aria-label="Close media viewer"
