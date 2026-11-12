@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
-import { ChevronLeft, ChevronRight, Download, ExternalLink, Maximize, Minimize, X, ZoomIn, ZoomOut } from "lucide-react";
+import { ChevronLeft, ChevronRight, Download, ExternalLink, Maximize, Minimize, Moon, Sun, X, ZoomIn, ZoomOut } from "lucide-react";
+import DarkPdfPages from "@/components/DarkPdfPages";
 
 export interface FullscreenMediaItem {
   url: string;
@@ -30,6 +31,7 @@ const FullscreenMediaViewer: React.FC<FullscreenMediaViewerProps> = ({
   const rootRef = useRef<HTMLDivElement>(null);
   const [zoomIndex, setZoomIndex] = useState(0);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [pdfDark, setPdfDark] = useState(false);
   const [controlsVisible, setControlsVisible] = useState(true);
   const hideTimerRef = useRef<number | undefined>(undefined);
   const mediaRef = useRef<HTMLDivElement>(null);
@@ -118,6 +120,7 @@ const FullscreenMediaViewer: React.FC<FullscreenMediaViewerProps> = ({
     </a>
   );
   const isTouchPrimary = window.matchMedia("(pointer: coarse)").matches;
+  const showDarkPdf = isPdfItem && !isTouchPrimary && pdfDark;
   const zoom = ZOOM_STEPS[zoomIndex];
   const canZoomOut = zoomIndex > 0;
   const canZoomIn = zoomIndex < ZOOM_STEPS.length - 1;
@@ -211,6 +214,27 @@ const FullscreenMediaViewer: React.FC<FullscreenMediaViewerProps> = ({
               </button>
             </>
           )}
+          {isPdfItem && !isTouchPrimary && (
+            <button
+              type="button"
+              onClick={() => setPdfDark((value) => !value)}
+              aria-label={pdfDark ? "Show PDF in original colors" : "Show PDF in dark mode"}
+              aria-pressed={pdfDark}
+              className="rounded-lg p-2 transition-colors hover:bg-gray-700"
+            >
+              {pdfDark ? <Sun className="h-5 w-5 text-white" /> : <Moon className="h-5 w-5 text-white" />}
+            </button>
+          )}
+          {showDarkPdf && selectedItem.download && (
+            <button
+              type="button"
+              onClick={() => void selectedItem.download?.()}
+              aria-label="Download PDF"
+              className="rounded-lg p-2 transition-colors hover:bg-gray-700"
+            >
+              <Download className="h-5 w-5 text-white" />
+            </button>
+          )}
           <button
             onClick={toggleFullscreen}
             aria-label={isFullscreen ? "Exit full screen" : "Enter full screen"}
@@ -260,7 +284,7 @@ const FullscreenMediaViewer: React.FC<FullscreenMediaViewerProps> = ({
               className="m-auto max-h-full max-w-full"
             />
           ) : (
-            <div className="flex h-full w-full flex-col items-center justify-center">
+            <div className={`flex h-full w-full flex-col ${showDarkPdf ? "" : "items-center justify-center"}`}>
               {isPdf(selectedItem.name) && isTouchPrimary ? (
                 <div className="flex flex-col items-center gap-4 px-6 text-center">
                   <p className="text-lg text-white">{selectedItem.name}</p>
@@ -275,14 +299,14 @@ const FullscreenMediaViewer: React.FC<FullscreenMediaViewerProps> = ({
                   </a>
                   {renderDownloadControl("inline-flex items-center gap-2 rounded-lg px-6 py-3 text-sheraton-gold transition-colors hover:text-white")}
                 </div>
+              ) : showDarkPdf ? (
+                <DarkPdfPages url={selectedItem.url} width={available?.width ?? 0} />
               ) : isPdf(selectedItem.name) ? (
-                <>
-                  <iframe
-                    src={selectedItem.url}
-                    className="h-full w-full border-0"
-                    title={selectedItem.name}
-                  />
-                </>
+                <iframe
+                  src={selectedItem.url}
+                  className="h-full w-full border-0"
+                  title={selectedItem.name}
+                />
               ) : (
                 <div className="text-center">
                   <div className="mb-4 text-6xl">📄</div>
