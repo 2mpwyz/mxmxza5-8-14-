@@ -263,7 +263,7 @@ const FullscreenMediaViewer: React.FC<FullscreenMediaViewerProps> = ({
       <div className="relative flex min-h-0 flex-1">
         <div
           ref={mediaRef}
-          className={`absolute inset-0 flex overflow-auto px-16 ${isFullscreen ? "" : "py-4"}`}
+          className={`absolute inset-0 flex overflow-auto px-16 ${isFullscreen ? "" : "py-4"} ${showDarkPdf ? "bg-black" : ""}`}
           style={showDarkPdf ? { scrollbarGutter: "stable" } : undefined}
         >
           {isImage ? (
