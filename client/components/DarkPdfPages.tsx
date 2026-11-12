@@ -2,18 +2,44 @@ import { useEffect, useRef, useState } from "react";
 import type { PDFDocumentLoadingTask, PDFDocumentProxy } from "pdfjs-dist";
 import pdfWorkerUrl from "pdfjs-dist/build/pdf.worker.min.mjs?url";
 
-const NEUTRAL_CHROMA_LIMIT = 24;
-
-const invertNeutralPixels = (imageData: ImageData) => {
+const flipLightnessKeepHue = (imageData: ImageData) => {
   const { data } = imageData;
   for (let i = 0; i < data.length; i += 4) {
-    const r = data[i];
-    const g = data[i + 1];
-    const b = data[i + 2];
-    if (Math.max(r, g, b) - Math.min(r, g, b) > NEUTRAL_CHROMA_LIMIT) continue;
-    data[i] = 255 - r;
-    data[i + 1] = 255 - g;
-    data[i + 2] = 255 - b;
+    const r = data[i] / 255;
+    const g = data[i + 1] / 255;
+    const b = data[i + 2] / 255;
+    const max = Math.max(r, g, b);
+    const min = Math.min(r, g, b);
+    const delta = max - min;
+    const lightness = (max + min) / 2;
+    const flipped = 1 - lightness;
+
+    if (delta === 0) {
+      data[i] = data[i + 1] = data[i + 2] = flipped * 255;
+      continue;
+    }
+
+    const saturation = delta / (1 - Math.abs(2 * lightness - 1));
+    const chroma = saturation * (1 - Math.abs(2 * flipped - 1));
+    const hue =
+      max === r ? (g - b) / delta : max === g ? (b - r) / delta + 2 : (r - g) / delta + 4;
+    const sector = ((hue % 6) + 6) % 6;
+    const x = chroma * (1 - Math.abs((sector % 2) - 1));
+
+    let rp = 0;
+    let gp = 0;
+    let bp = 0;
+    if (sector < 1) [rp, gp] = [chroma, x];
+    else if (sector < 2) [rp, gp] = [x, chroma];
+    else if (sector < 3) [gp, bp] = [chroma, x];
+    else if (sector < 4) [gp, bp] = [x, chroma];
+    else if (sector < 5) [rp, bp] = [x, chroma];
+    else [rp, bp] = [chroma, x];
+
+    const m = flipped - chroma / 2;
+    data[i] = (rp + m) * 255;
+    data[i + 1] = (gp + m) * 255;
+    data[i + 2] = (bp + m) * 255;
   }
 };
 
@@ -81,7 +107,7 @@ const DarkPdfPages = ({ url, width }: DarkPdfPagesProps) => {
         if (cancelled) return;
 
         const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
-        invertNeutralPixels(imageData);
+        flipLightnessKeepHue(imageData);
         context.putImageData(imageData, 0, 0);
         container.appendChild(canvas);
       }
