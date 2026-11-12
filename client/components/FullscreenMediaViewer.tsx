@@ -187,7 +187,7 @@ const FullscreenMediaViewer: React.FC<FullscreenMediaViewerProps> = ({
         {!isFullscreen && <div className="flex flex-1 justify-start">{pdfTypeLabel}</div>}
         <div className="flex items-center gap-4 sm:gap-2">
           {isFullscreen && pdfTypeLabel}
-          {isImage && (
+          {(isImage || showDarkPdf) && (
             <>
               <button
                 onClick={() => setZoomIndex((index) => index - 1)}
@@ -217,7 +217,10 @@ const FullscreenMediaViewer: React.FC<FullscreenMediaViewerProps> = ({
           {isPdfItem && !isTouchPrimary && (
             <button
               type="button"
-              onClick={() => setPdfDark((value) => !value)}
+              onClick={() => {
+                setPdfDark((value) => !value);
+                setZoomIndex(0);
+              }}
               aria-label={pdfDark ? "Show PDF in original colors" : "Show PDF in dark mode"}
               aria-pressed={pdfDark}
               className="rounded-lg p-2 transition-colors hover:bg-gray-700"
@@ -304,7 +307,11 @@ const FullscreenMediaViewer: React.FC<FullscreenMediaViewerProps> = ({
                   {renderDownloadControl("inline-flex items-center gap-2 rounded-lg px-6 py-3 text-sheraton-gold transition-colors hover:text-white")}
                 </div>
               ) : showDarkPdf ? (
-                <DarkPdfPages url={selectedItem.url} width={available?.width ?? 0} />
+                <DarkPdfPages
+                  url={selectedItem.url}
+                  width={(available?.width ?? 0) * zoom}
+                  scrollRef={mediaRef}
+                />
               ) : isPdf(selectedItem.name) ? (
                 <iframe
                   src={selectedItem.url}
