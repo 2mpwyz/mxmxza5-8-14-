@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import type { PDFDocumentLoadingTask } from "pdfjs-dist";
+import type { PDFDocumentLoadingTask, PDFDocumentProxy } from "pdfjs-dist";
 import pdfWorkerUrl from "pdfjs-dist/build/pdf.worker.min.mjs?url";
 
 const NEUTRAL_CHROMA_LIMIT = 24;
@@ -24,22 +24,42 @@ interface DarkPdfPagesProps {
 
 const DarkPdfPages = ({ url, width }: DarkPdfPagesProps) => {
   const containerRef = useRef<HTMLDivElement>(null);
+  const [pdf, setPdf] = useState<PDFDocumentProxy | null>(null);
   const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
 
   useEffect(() => {
-    const container = containerRef.current;
-    if (!container || width <= 0) return;
-
     let cancelled = false;
     let loadingTask: PDFDocumentLoadingTask | null = null;
-    container.replaceChildren();
+    setPdf(null);
     setStatus("loading");
 
-    const render = async () => {
+    const load = async () => {
       const pdfjs = await import("pdfjs-dist");
       pdfjs.GlobalWorkerOptions.workerSrc = pdfWorkerUrl;
       loadingTask = pdfjs.getDocument({ url });
-      const pdf = await loadingTask.promise;
+      const document = await loadingTask.promise;
+      if (!cancelled) setPdf(document);
+    };
+
+    load().catch((error) => {
+      console.error("Dark PDF load failed", error);
+      if (!cancelled) setStatus("error");
+    });
+
+    return () => {
+      cancelled = true;
+      void loadingTask?.destroy();
+    };
+  }, [url]);
+
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!pdf || !container || width <= 0) return;
+
+    let cancelled = false;
+    container.replaceChildren();
+
+    const renderPages = async () => {
       const devicePixelRatio = Math.min(window.devicePixelRatio || 1, 2);
 
       for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber++) {
@@ -68,16 +88,15 @@ const DarkPdfPages = ({ url, width }: DarkPdfPagesProps) => {
       setStatus("ready");
     };
 
-    render().catch((error) => {
+    renderPages().catch((error) => {
       console.error("Dark PDF render failed", error);
       if (!cancelled) setStatus("error");
     });
 
     return () => {
       cancelled = true;
-      void loadingTask?.destroy();
     };
-  }, [url, width]);
+  }, [pdf, width]);
 
   return (
     <div className="w-full">
