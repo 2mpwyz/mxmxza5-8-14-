@@ -2,44 +2,19 @@ import { useEffect, useRef, useState } from "react";
 import type { PDFDocumentLoadingTask, PDFDocumentProxy } from "pdfjs-dist";
 import pdfWorkerUrl from "pdfjs-dist/build/pdf.worker.min.mjs?url";
 
-const flipLightnessKeepHue = (imageData: ImageData) => {
+const NEUTRAL_SPREAD = 12;
+const TRANSPARENT = "rgba(0, 0, 0, 0)";
+
+const mapNeutralPixels = (imageData: ImageData, map: (channel: number) => number) => {
   const { data } = imageData;
   for (let i = 0; i < data.length; i += 4) {
-    const r = data[i] / 255;
-    const g = data[i + 1] / 255;
-    const b = data[i + 2] / 255;
-    const max = Math.max(r, g, b);
-    const min = Math.min(r, g, b);
-    const delta = max - min;
-    const lightness = (max + min) / 2;
-    const flipped = 1 - lightness;
-
-    if (delta === 0) {
-      data[i] = data[i + 1] = data[i + 2] = flipped * 255;
-      continue;
-    }
-
-    const saturation = delta / (1 - Math.abs(2 * lightness - 1));
-    const chroma = saturation * (1 - Math.abs(2 * flipped - 1));
-    const hue =
-      max === r ? (g - b) / delta : max === g ? (b - r) / delta + 2 : (r - g) / delta + 4;
-    const sector = ((hue % 6) + 6) % 6;
-    const x = chroma * (1 - Math.abs((sector % 2) - 1));
-
-    let rp = 0;
-    let gp = 0;
-    let bp = 0;
-    if (sector < 1) [rp, gp] = [chroma, x];
-    else if (sector < 2) [rp, gp] = [x, chroma];
-    else if (sector < 3) [gp, bp] = [chroma, x];
-    else if (sector < 4) [gp, bp] = [x, chroma];
-    else if (sector < 5) [rp, bp] = [x, chroma];
-    else [rp, bp] = [chroma, x];
-
-    const m = flipped - chroma / 2;
-    data[i] = (rp + m) * 255;
-    data[i + 1] = (gp + m) * 255;
-    data[i + 2] = (bp + m) * 255;
+    const r = data[i];
+    const g = data[i + 1];
+    const b = data[i + 2];
+    if (data[i + 3] === 0 || Math.max(r, g, b) - Math.min(r, g, b) > NEUTRAL_SPREAD) continue;
+    data[i] = map(r);
+    data[i + 1] = map(g);
+    data[i + 2] = map(b);
   }
 };
 
@@ -86,7 +61,53 @@ const DarkPdfPages = ({ url, width }: DarkPdfPagesProps) => {
     container.replaceChildren();
 
     const renderPages = async () => {
+      const { OPS } = await import("pdfjs-dist");
       const devicePixelRatio = Math.min(window.devicePixelRatio || 1, 2);
+
+      const textOps = new Set([
+        OPS.showText,
+        OPS.showSpacedText,
+        OPS.nextLineShowText,
+        OPS.nextLineSetSpacingShowText,
+      ]);
+      const drawingOps = new Set([
+        OPS.moveTo,
+        OPS.lineTo,
+        OPS.curveTo,
+        OPS.curveTo2,
+        OPS.curveTo3,
+        OPS.rectangle,
+        OPS.closePath,
+        OPS.constructPath,
+        OPS.rawFillPath,
+        OPS.endPath,
+        OPS.clip,
+        OPS.eoClip,
+        OPS.stroke,
+        OPS.closeStroke,
+        OPS.fill,
+        OPS.eoFill,
+        OPS.fillStroke,
+        OPS.eoFillStroke,
+        OPS.closeFillStroke,
+        OPS.closeEOFillStroke,
+        OPS.shadingFill,
+        OPS.beginInlineImage,
+        OPS.beginImageData,
+        OPS.endInlineImage,
+        OPS.paintImageMaskXObject,
+        OPS.paintImageMaskXObjectGroup,
+        OPS.paintImageXObject,
+        OPS.paintInlineImageXObject,
+        OPS.paintInlineImageXObjectGroup,
+        OPS.paintImageXObjectRepeat,
+        OPS.paintImageMaskXObjectRepeat,
+        OPS.paintSolidColorImageMask,
+      ]);
+      const withoutText = (index: number, list: { fnArray: number[] }) =>
+        !textOps.has(list.fnArray[index]);
+      const textOnly = (index: number, list: { fnArray: number[] }) =>
+        !drawingOps.has(list.fnArray[index]);
 
       for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber++) {
         const page = await pdf.getPage(pageNumber);
@@ -102,13 +123,42 @@ const DarkPdfPages = ({ url, width }: DarkPdfPagesProps) => {
         canvas.className = "mx-auto mb-4 block";
 
         const context = canvas.getContext("2d");
-        if (!context) throw new Error("Canvas 2D context unavailable");
-        await page.render({ canvasContext: context, canvas, viewport }).promise;
-        if (cancelled) return;
+        const layer = document.createElement("canvas");
+        layer.width = canvas.width;
+        layer.height = canvas.height;
+        const layerContext = layer.getContext("2d", { willReadFrequently: true });
+        if (!context || !layerContext) throw new Error("Canvas 2D context unavailable");
 
-        const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
-        flipLightnessKeepHue(imageData);
-        context.putImageData(imageData, 0, 0);
+        context.fillStyle = "#000000";
+        context.fillRect(0, 0, canvas.width, canvas.height);
+
+        await page.render({
+          canvasContext: layerContext,
+          canvas: layer,
+          viewport,
+          background: TRANSPARENT,
+          operationsFilter: withoutText,
+        }).promise;
+        if (cancelled) return;
+        const graphics = layerContext.getImageData(0, 0, layer.width, layer.height);
+        mapNeutralPixels(graphics, (channel) => 255 - channel);
+        layerContext.putImageData(graphics, 0, 0);
+        context.drawImage(layer, 0, 0);
+
+        layerContext.clearRect(0, 0, layer.width, layer.height);
+        await page.render({
+          canvasContext: layerContext,
+          canvas: layer,
+          viewport,
+          background: TRANSPARENT,
+          operationsFilter: textOnly,
+        }).promise;
+        if (cancelled) return;
+        const text = layerContext.getImageData(0, 0, layer.width, layer.height);
+        mapNeutralPixels(text, () => 255);
+        layerContext.putImageData(text, 0, 0);
+        context.drawImage(layer, 0, 0);
+
         container.appendChild(canvas);
       }
       setStatus("ready");
