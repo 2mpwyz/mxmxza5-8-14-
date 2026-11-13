@@ -210,6 +210,7 @@ async function createInvoicePdf(invoiceId: string, documentKind: "invoice" | "re
   const menuServiceFee = Number(menuCharges?.data?.service_fee ?? 0);
   const menuTip = Number(menuCharges?.data?.tip_amount ?? 0);
   let vatAmount: number | null = null;
+  let vatInclusiveNet: number | null = null;
   let vatRatePercentage: number | null = null;
   if (isVatInclusiveSale) {
     const { data: vatRate, error: vatRateError } = await client.rpc("books_confirmed_invoice_vat_rate", {
@@ -226,6 +227,7 @@ async function createInvoicePdf(invoiceId: string, documentKind: "invoice" | "re
       const gross = Number(invoice.subtotal) + Number(invoice.tax_amount) + menuServiceFee;
       const net = Math.round((gross / (1 + Number(vatRate) / 100)) * factor) / factor;
       vatAmount = Math.round((gross - net) * factor) / factor;
+      vatInclusiveNet = net;
       vatRatePercentage = Number(vatRate);
     }
   }
@@ -262,8 +264,8 @@ async function createInvoicePdf(invoiceId: string, documentKind: "invoice" | "re
     const vatLabel = isWorkerTaskInvoice ? `VAT (${Number(invoice.tax_rate_percentage)}%)` : "VAT";
     document.text(`Net Amount: ${invoice.subtotal} ${invoice.currency_code}`, { align: "right" });
     document.text(`${vatLabel}: ${invoice.tax_amount} ${invoice.currency_code}`, { align: "right" });
-  } else if (vatAmount === null) {
-    document.text(`Net Amount: ${Number(invoice.subtotal) + Number(invoice.tax_amount)} ${invoice.currency_code}`, { align: "right" });
+  } else if (vatInclusiveNet !== null) {
+    document.text(`Net Amount: ${vatInclusiveNet} ${invoice.currency_code}`, { align: "right" });
   }
   if (menuCharges?.data) {
     if (menuTip > 0) document.text(`Tip: ${menuTip} ${invoice.currency_code}`, { align: "right" });
