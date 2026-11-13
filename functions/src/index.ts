@@ -185,7 +185,7 @@ function isValidEmail(value: string | null | undefined): value is string {
 
 async function createInvoicePdf(invoiceId: string, documentKind: "invoice" | "receipt"): Promise<InvoiceDocument> {
   const client = supabase();
-  const { data: invoice, error: invoiceError } = await client.from("books_invoices").select("id,invoice_number,issue_date,due_date,currency_code,subtotal,tax_amount,other_charges,total_due,organization_id,contact_id,invoice_storage_key,receipt_storage_key,notes,buyer_tax_id").eq("id", invoiceId).single();
+  const { data: invoice, error: invoiceError } = await client.from("books_invoices").select("id,invoice_number,issue_date,due_date,currency_code,subtotal,tax_amount,tax_rate_percentage,other_charges,total_due,organization_id,contact_id,invoice_storage_key,receipt_storage_key,notes,buyer_tax_id").eq("id", invoiceId).single();
   if (invoiceError || !invoice) throw invoiceError || new Error("Invoice not found");
   if (!invoice.contact_id) throw new Error("Invoice has no customer contact");
   const { data: loyaltyData, error: loyaltyError } = await client.rpc("get_paid_invoice_loyalty_receipt", { target_invoice_id: invoice.id });
@@ -251,13 +251,18 @@ async function createInvoicePdf(invoiceId: string, documentKind: "invoice" | "re
   document.moveDown();
   document.fontSize(11).text("Description").text("Amount", { align: "right" });
   const menuTipLines = menuCharges?.data ? ["Tip"] : [];
+  const taskGrossAmount = Number(invoice.subtotal) + Number(invoice.tax_amount);
   for (const line of (lines || []).filter((line) => !menuTipLines.includes(line.description))) {
-    document.fontSize(10).text(`${line.description} (${line.quantity} × ${line.unit_price})`).text(`${line.line_total} ${invoice.currency_code}`, { align: "right" });
+    const unitPrice = isWorkerTaskInvoice ? taskGrossAmount : line.unit_price;
+    const lineTotal = isWorkerTaskInvoice ? taskGrossAmount : line.line_total;
+    document.fontSize(10).text(`${line.description} (${line.quantity} × ${unitPrice})`).text(`${lineTotal} ${invoice.currency_code}`, { align: "right" });
   }
   document.moveDown();
   if (!isVatInclusiveSale) {
-    document.text(`Subtotal: ${invoice.subtotal} ${invoice.currency_code}`, { align: "right" });
-    document.text(`VAT: ${invoice.tax_amount} ${invoice.currency_code}`, { align: "right" });
+    const subtotalLabel = isWorkerTaskInvoice ? "Subtotal (Net)" : "Subtotal";
+    const vatLabel = isWorkerTaskInvoice ? `VAT (${Number(invoice.tax_rate_percentage)}%)` : "VAT";
+    document.text(`${subtotalLabel}: ${invoice.subtotal} ${invoice.currency_code}`, { align: "right" });
+    document.text(`${vatLabel}: ${invoice.tax_amount} ${invoice.currency_code}`, { align: "right" });
   } else if (vatAmount === null) {
     document.text(`Subtotal: ${Number(invoice.subtotal) + Number(invoice.tax_amount)} ${invoice.currency_code}`, { align: "right" });
   }
