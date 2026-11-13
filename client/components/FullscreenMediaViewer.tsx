@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { ChevronLeft, ChevronRight, Download, ExternalLink, Maximize, Minimize, Moon, Sun, X, ZoomIn, ZoomOut } from "lucide-react";
 import DarkPdfPages from "@/components/DarkPdfPages";
+import MuxVideoPlayer from "@/components/MuxVideoPlayer";
 
 export interface FullscreenMediaItem {
   url: string;
@@ -8,6 +9,7 @@ export interface FullscreenMediaItem {
   type: string;
   typeLabel?: string;
   name: string;
+  filename?: string;
   description?: string | null;
   fileSize?: number;
   footerLabel?: string;
@@ -283,13 +285,10 @@ const FullscreenMediaViewer: React.FC<FullscreenMediaViewerProps> = ({
               className={imageDisplaySize ? "m-auto max-w-none" : "m-auto max-h-full max-w-full object-contain"}
               style={imageDisplaySize ?? undefined}
             />
-          ) : selectedItem.type === "video" ? (
-            <video
-              src={selectedItem.url}
-              controls
-              autoPlay
-              className="m-auto max-h-full max-w-full"
-            />
+          ) : selectedItem.type === "video" && selectedItem.filename ? (
+            <div className="m-auto w-full">
+              <MuxVideoPlayer key={selectedItem.url} filename={selectedItem.filename} controlsMode="minimal" />
+            </div>
           ) : (
             <div className={`flex h-full w-full flex-col ${showDarkPdf ? "" : "items-center justify-center"}`}>
               {isPdf(selectedItem.name) && isTouchPrimary ? (

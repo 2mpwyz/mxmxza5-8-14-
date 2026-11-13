@@ -196,7 +196,6 @@ const TodoListTab: React.FC<TodoListTabProps> = ({
                         attachments={taskAttachments.get(task.id)!}
                         compact={true}
                         popupPlacement="auto"
-                        popupAllAttachments={true}
                         popupAlignment="container"
                       />
                     )}
@@ -492,14 +491,6 @@ const TodoListTab: React.FC<TodoListTabProps> = ({
                     <p className="mt-1.5 text-sm font-semibold capitalize text-slate-800 dark:text-slate-100">{task.assigned_category}</p>
                   </div>
                 )}
-                {taskAttachments.get(task.id)?.some((attachment) => attachment.fileType === "video") && (
-                  <div className="col-span-2 border-t border-slate-200 dark:border-slate-700 pt-3">
-                    <AttachmentList
-                      attachments={taskAttachments.get(task.id)!.filter((attachment) => attachment.fileType === "video")}
-                      compact={true}
-                    />
-                  </div>
-                )}
               </div>
 
               <div className="mt-4 flex items-center gap-2 border-t border-slate-100 dark:border-slate-700 pt-3">
@@ -515,10 +506,10 @@ const TodoListTab: React.FC<TodoListTabProps> = ({
                   <MessageSquare className="mr-1.5 h-4 w-4" />
                   Chat
                 </Button>
-                {taskAttachments.get(task.id)?.some((attachment) => attachment.fileType !== "video") && (
+                {(taskAttachments.get(task.id)?.length ?? 0) > 0 && (
                   <div className="flex flex-1 justify-center">
                     <AttachmentList
-                      attachments={taskAttachments.get(task.id)!.filter((attachment) => attachment.fileType !== "video")}
+                      attachments={taskAttachments.get(task.id)!}
                       compact={true}
                       popupPlacement="top"
                     />

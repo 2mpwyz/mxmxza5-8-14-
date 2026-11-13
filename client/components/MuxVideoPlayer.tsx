@@ -346,4 +346,35 @@ export const MuxVideoPlayer: React.FC<MuxVideoPlayerProps> = ({
   );
 };
 
+export const MuxVideoThumbnail: React.FC<{ filename: string; className?: string }> = ({ filename, className }) => {
+  const [playbackId, setPlaybackId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!filename) return;
+    let isActive = true;
+    supabase
+      .from("video_uploads")
+      .select("playback_id, status")
+      .eq("filename", filename)
+      .maybeSingle()
+      .then(({ data }) => {
+        if (isActive && data?.status === "ready" && data.playback_id) setPlaybackId(data.playback_id);
+      });
+    return () => {
+      isActive = false;
+    };
+  }, [filename]);
+
+  if (!playbackId) return <div className={`bg-black ${className ?? ""}`} />;
+
+  return (
+    <img
+      src={`https://image.mux.com/${encodeURIComponent(playbackId)}/thumbnail.jpg?time=1&width=640`}
+      alt=""
+      loading="lazy"
+      className={className}
+    />
+  );
+};
+
 export default MuxVideoPlayer;

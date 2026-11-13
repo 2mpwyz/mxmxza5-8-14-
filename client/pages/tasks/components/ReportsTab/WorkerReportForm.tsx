@@ -3,6 +3,7 @@ import { supabase, Task as TaskType, UserProfile, TaskReport, TaskChecklist, Tas
 import { toast } from "../../../../hooks/use-toast";
 import { useFileUpload } from "../../../../hooks/useFileUpload";
 import EvidenceUploadZone, { FileAttachment } from "../../../../components/EvidenceUploadZone";
+import MuxVideoPlayer from "../../../../components/MuxVideoPlayer";
 
 interface WorkerReportFormProps {
   task: TaskType;
@@ -455,11 +456,7 @@ const WorkerReportForm: React.FC<WorkerReportFormProps> = ({
                             className="max-w-full max-h-64 rounded border border-gray-200"
                           />
                         ) : evidence.attachments.file_type === 'video' ? (
-                          <video
-                            src={evidence.attachments.b2_url}
-                            controls
-                            className="max-w-full max-h-64 rounded border border-gray-200 bg-black"
-                          />
+                          <MuxVideoPlayer filename={evidence.attachments.filename} controlsMode="minimal" />
                         ) : (
                           <a
                             href={evidence.attachments.b2_url}
@@ -502,11 +499,7 @@ const WorkerReportForm: React.FC<WorkerReportFormProps> = ({
                             className="max-w-full max-h-64 rounded border border-gray-200"
                           />
                         ) : evidence.attachments.file_type === 'video' ? (
-                          <video
-                            src={evidence.attachments.b2_url}
-                            controls
-                            className="max-w-full max-h-64 rounded border border-gray-200 bg-black"
-                          />
+                          <MuxVideoPlayer filename={evidence.attachments.filename} controlsMode="minimal" />
                         ) : (
                           <a
                             href={evidence.attachments.b2_url}

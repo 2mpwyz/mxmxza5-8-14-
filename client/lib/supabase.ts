@@ -297,7 +297,7 @@ export interface TaskEvidenceSubmission {
   worker_id: string
   evidence_type: 'photo' | 'video' | 'document' | 'signature'
   attachment_id: string
-  attachments?: Pick<Attachment, "b2_url" | "file_type" | "original_name" | "file_size"> | null
+  attachments?: Pick<Attachment, "filename" | "b2_url" | "file_type" | "original_name" | "file_size"> | null
   description: string | null
   submitted_at: string
   approved_at: string | null
