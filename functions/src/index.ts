@@ -259,12 +259,11 @@ async function createInvoicePdf(invoiceId: string, documentKind: "invoice" | "re
   }
   document.moveDown();
   if (!isVatInclusiveSale) {
-    const subtotalLabel = isWorkerTaskInvoice ? "Net Amount" : "Subtotal";
     const vatLabel = isWorkerTaskInvoice ? `VAT (${Number(invoice.tax_rate_percentage)}%)` : "VAT";
-    document.text(`${subtotalLabel}: ${invoice.subtotal} ${invoice.currency_code}`, { align: "right" });
+    document.text(`Net Amount: ${invoice.subtotal} ${invoice.currency_code}`, { align: "right" });
     document.text(`${vatLabel}: ${invoice.tax_amount} ${invoice.currency_code}`, { align: "right" });
   } else if (vatAmount === null) {
-    document.text(`Subtotal: ${Number(invoice.subtotal) + Number(invoice.tax_amount)} ${invoice.currency_code}`, { align: "right" });
+    document.text(`Net Amount: ${Number(invoice.subtotal) + Number(invoice.tax_amount)} ${invoice.currency_code}`, { align: "right" });
   }
   if (menuCharges?.data) {
     if (menuTip > 0) document.text(`Tip: ${menuTip} ${invoice.currency_code}`, { align: "right" });
