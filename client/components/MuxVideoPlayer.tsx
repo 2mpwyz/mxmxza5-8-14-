@@ -50,6 +50,7 @@ export const MuxVideoPlayer: React.FC<MuxVideoPlayerProps> = ({
   const [duration, setDuration] = useState(0);
   const [currentTime, setCurrentTime] = useState(0);
   const [hasEnteredLoadRange, setHasEnteredLoadRange] = useState(false);
+  const [manifestChecked, setManifestChecked] = useState(false);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const isMountedRef = useRef(true);
   const muxPlayerRef = useRef<MuxPlayerElement | null>(null);
@@ -140,20 +141,44 @@ export const MuxVideoPlayer: React.FC<MuxVideoPlayerProps> = ({
     };
   }, [attachmentId, filename, hasEnteredLoadRange, initialAspectRatio, initialPlaybackId, initialVideoStatus]);
 
+  useEffect(() => {
+    if (!playbackId || aspectRatio !== null) return;
+    let isActive = true;
+    window.fetch(`https://stream.mux.com/${encodeURIComponent(playbackId)}.m3u8`)
+      .then((response) => (response.ok ? response.text() : ""))
+      .then((manifest) => {
+        if (!isActive) return;
+        const resolution = manifest.match(/RESOLUTION=(\d+)x(\d+)/);
+        if (resolution) {
+          const ratio = Number(resolution[1]) / Number(resolution[2]);
+          setAspectRatio(ratio);
+          onAspectRatioChange?.(ratio);
+        }
+        setManifestChecked(true);
+      })
+      .catch(() => {
+        if (isActive) setManifestChecked(true);
+      });
+    return () => {
+      isActive = false;
+    };
+  }, [aspectRatio, playbackId]);
+
+  const displayAspectRatio = aspectRatio ?? 16 / 9;
   const isPortrait = aspectRatio !== null && aspectRatio < 1;
   const isImmersivePortrait = presentation === "immersive" && isPortrait;
   const isMobileImmersiveFrame = presentation === "immersive" && viewportWidth < 768;
   const frameStyle: React.CSSProperties = presentation === "immersive"
     ? isMobileImmersiveFrame || isImmersivePortrait
-      ? { aspectRatio: aspectRatio ?? undefined, width: "100%", maxWidth: "100%" }
+      ? { aspectRatio: displayAspectRatio, width: "100%", maxWidth: "100%" }
       : {
-            aspectRatio: aspectRatio ?? undefined,
+            aspectRatio: displayAspectRatio,
             width: "100%",
             maxHeight: "68svh",
             maxWidth: aspectRatio !== null ? `min(100%, calc(68svh * ${aspectRatio}))` : "100%",
           }
     : {
-        aspectRatio: aspectRatio ?? undefined,
+        aspectRatio: displayAspectRatio,
         width: isPortrait && aspectRatio !== null ? `${Math.min(448, viewportHeight * 0.7 * aspectRatio)}px` : "100%",
         maxHeight: "70svh",
         maxWidth: isPortrait ? "100%" : aspectRatio !== null ? `min(100%, calc(70svh * ${aspectRatio}))` : "100%",
@@ -280,7 +305,7 @@ export const MuxVideoPlayer: React.FC<MuxVideoPlayerProps> = ({
         togglePlayback();
       } : undefined}
     >
-      {playbackId && hasEnteredLoadRange && (
+      {playbackId && hasEnteredLoadRange && (aspectRatio !== null || manifestChecked) && (
         <Suspense fallback={null}>
           <MuxPlayer
             ref={muxPlayerRef}
