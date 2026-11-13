@@ -177,6 +177,8 @@ export const MuxVideoPlayer: React.FC<MuxVideoPlayerProps> = ({
     };
   }, [aspectRatio, filename, hasEnteredLoadRange, playbackId]);
 
+  const isAspectRatioPending = aspectRatio === null && !manifestChecked;
+  const isBlankPending = isAspectRatioPending && !overlay;
   const displayAspectRatio = aspectRatio ?? 16 / 9;
   const isPortrait = aspectRatio !== null && aspectRatio < 1;
   const isImmersivePortrait = presentation === "immersive" && isPortrait;
@@ -205,9 +207,12 @@ export const MuxVideoPlayer: React.FC<MuxVideoPlayerProps> = ({
   } as React.CSSProperties & { [key: `--${string}`]: string | undefined };
   const isDesktopMinimalControls = controlsMode === "minimal" && viewportWidth >= 768;
   const isMobileMinimalControls = controlsMode === "minimal" && viewportWidth < 768;
-  const frameClass = `${presentation === "immersive"
-    ? "relative w-full overflow-hidden bg-black"
-    : "relative mx-auto w-full overflow-hidden rounded-xl bg-black shadow-md"} ${isDesktopMinimalControls ? "group" : ""}`;
+  const frameClass = [
+    presentation === "immersive" ? "relative w-full overflow-hidden" : "relative mx-auto w-full overflow-hidden rounded-xl",
+    !isBlankPending && "bg-black",
+    presentation !== "immersive" && !isBlankPending && "shadow-md",
+    isDesktopMinimalControls && "group",
+  ].filter(Boolean).join(" ");
   const showOverlay = overlayOnlyOnMobilePortrait
     ? presentation === "immersive" && isPortrait && viewportWidth < 768
     : !(presentation === "immersive" && isPortrait && viewportWidth >= 768);
@@ -307,9 +312,6 @@ export const MuxVideoPlayer: React.FC<MuxVideoPlayerProps> = ({
       </div>
     </div>
   );
-
-  const isAspectRatioPending = aspectRatio === null && !manifestChecked;
-  if (isAspectRatioPending && !overlay) return <div ref={frameRef} />;
 
   return (
     <div
