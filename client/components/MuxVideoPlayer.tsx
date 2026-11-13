@@ -5,6 +5,14 @@ import { supabase } from "../lib/supabase";
 
 const MuxPlayer = lazy(() => import("@mux/mux-player-react"));
 
+const saveAspectRatio = async (filename: string, aspectRatio: number) => {
+  await supabase
+    .from("video_uploads")
+    .update({ aspect_ratio: aspectRatio })
+    .eq("filename", filename)
+    .is("aspect_ratio", null);
+};
+
 const formatVideoTime = (time: number) => {
   const totalSeconds = Math.floor(Math.max(0, Number.isFinite(time) ? time : 0));
   const hours = Math.floor(totalSeconds / 3600);
@@ -106,11 +114,15 @@ export const MuxVideoPlayer: React.FC<MuxVideoPlayerProps> = ({
         } else if (filename) {
           const { data: video } = await supabase
             .from("video_uploads")
-            .select("playback_id, status")
+            .select("playback_id, status, aspect_ratio")
             .eq("filename", filename)
             .maybeSingle();
           nextPlaybackId = video?.playback_id || null;
           status = video?.status || null;
+          const storedAspectRatio = video?.aspect_ratio;
+          if (storedAspectRatio && Number.isFinite(storedAspectRatio) && storedAspectRatio > 0) {
+            setAspectRatio(storedAspectRatio);
+          }
         }
 
         if (!isMountedRef.current) return;
@@ -142,7 +154,7 @@ export const MuxVideoPlayer: React.FC<MuxVideoPlayerProps> = ({
   }, [attachmentId, filename, hasEnteredLoadRange, initialAspectRatio, initialPlaybackId, initialVideoStatus]);
 
   useEffect(() => {
-    if (!playbackId || aspectRatio !== null) return;
+    if (!hasEnteredLoadRange || !playbackId || aspectRatio !== null) return;
     let isActive = true;
     window.fetch(`https://stream.mux.com/${encodeURIComponent(playbackId)}.m3u8`)
       .then((response) => (response.ok ? response.text() : ""))
@@ -153,6 +165,7 @@ export const MuxVideoPlayer: React.FC<MuxVideoPlayerProps> = ({
           const ratio = Number(resolution[1]) / Number(resolution[2]);
           setAspectRatio(ratio);
           onAspectRatioChange?.(ratio);
+          if (filename) void saveAspectRatio(filename, ratio);
         }
         setManifestChecked(true);
       })
@@ -162,7 +175,7 @@ export const MuxVideoPlayer: React.FC<MuxVideoPlayerProps> = ({
     return () => {
       isActive = false;
     };
-  }, [aspectRatio, playbackId]);
+  }, [aspectRatio, filename, hasEnteredLoadRange, playbackId]);
 
   const displayAspectRatio = aspectRatio ?? 16 / 9;
   const isPortrait = aspectRatio !== null && aspectRatio < 1;
@@ -294,6 +307,9 @@ export const MuxVideoPlayer: React.FC<MuxVideoPlayerProps> = ({
       </div>
     </div>
   );
+
+  const isAspectRatioPending = aspectRatio === null && !manifestChecked;
+  if (isAspectRatioPending && !overlay) return <div ref={frameRef} />;
 
   return (
     <div
