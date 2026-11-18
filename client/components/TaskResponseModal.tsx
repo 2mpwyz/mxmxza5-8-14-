@@ -16,6 +16,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 import { Loader, CheckCircle, XCircle, MessageSquare } from "lucide-react";
 import { supabase, Task as TaskType } from "../lib/supabase";
 import { formatTaskDeadline } from "../lib/taskDeadline";
+import DeadlineCountdown from "./DeadlineCountdown";
 import { toast } from "../hooks/use-toast";
 
 interface TaskResponseModalProps {
@@ -186,6 +187,7 @@ export const TaskResponseModal: React.FC<TaskResponseModalProps> = ({
                     <p className="font-semibold text-sheraton-navy mt-1">
                       {formatTaskDeadline(task.due_date)}
                     </p>
+                    <DeadlineCountdown dueDate={task.due_date} done={task.status === "completed"} className="mt-1" />
                   </div>
                 )}
 
