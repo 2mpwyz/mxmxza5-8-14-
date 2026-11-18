@@ -22,6 +22,7 @@ import FileUploadZone, {
   FileAttachment,
 } from "../../../../components/FileUploadZone";
 import TaskCreationTipsSidebar from "./TaskCreationTipsSidebar";
+import { TASK_CURRENCIES } from "../../../../lib/taskCurrency";
 
 interface FormData {
   title: string;
@@ -33,6 +34,7 @@ interface FormData {
   dueDate: string;
   estimatedTime: string;
   paymentTerms: string;
+  currency: string;
   budget: string;
   checklist: string[];
   evidenceTypes: string[];
@@ -290,18 +292,39 @@ const TaskCreationForm: React.FC<TaskCreationFormProps> = ({
               />
             </div>
 
-            <div className="space-y-2">
-              <Label>Budget Allocation</Label>
-              <Input
-                type="number"
-                placeholder="e.g., 500.00"
-                value={formData.budget}
-                onChange={(e) => onFormChange("budget", e.target.value)}
-                step="0.01"
-              />
-              <p className="text-xs text-muted-foreground">
-                The budget allocated to complete this task
-              </p>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Currency *</Label>
+                <Select
+                  value={formData.currency}
+                  onValueChange={(value) => onFormChange("currency", value)}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select currency" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {TASK_CURRENCIES.map((currency) => (
+                      <SelectItem key={currency.code} value={currency.code}>
+                        {currency.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Budget Allocation</Label>
+                <Input
+                  type="number"
+                  placeholder="e.g., 500.00"
+                  value={formData.budget}
+                  onChange={(e) => onFormChange("budget", e.target.value)}
+                  step="0.01"
+                />
+                <p className="text-xs text-muted-foreground">
+                  The budget allocated to complete this task, in the selected currency
+                </p>
+              </div>
             </div>
 
             {/* Checklist Section */}

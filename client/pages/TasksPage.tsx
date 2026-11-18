@@ -71,6 +71,7 @@ const TasksPage: React.FC = () => {
     dueDate: "",
     estimatedTime: "",
     paymentTerms: "",
+    currency: "",
     budget: "",
     checklist: [] as string[],
     evidenceTypes: [] as string[],
@@ -548,7 +549,7 @@ const TasksPage: React.FC = () => {
   };
 
   const handleCreateTask = async () => {
-    if (!tenant || !formData.title || !formData.priority || !formData.assignmentType || !formData.assignee) {
+    if (!tenant || !formData.title || !formData.priority || !formData.assignmentType || !formData.assignee || !formData.currency) {
       toast({
         title: "Validation Error",
         description: "Please fill in all required fields",
@@ -581,6 +582,7 @@ const TasksPage: React.FC = () => {
         payment_terms: formData.paymentTerms || null,
         is_from_complaint: selectedComplaint !== null,
         budget: formData.budget ? parseFloat(formData.budget) : null,
+        currency_code: formData.currency,
         created_by: currentUser?.id,
         organization_id: tenant.organizationId,
       };
@@ -688,6 +690,7 @@ const TasksPage: React.FC = () => {
         dueDate: "",
         estimatedTime: "",
         paymentTerms: "",
+        currency: "",
         budget: "",
         checklist: [],
         evidenceTypes: [],

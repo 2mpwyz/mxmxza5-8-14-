@@ -132,6 +132,7 @@ export interface Task {
   is_from_complaint: boolean
   budget: number | null
   final_amount: number | null
+  currency_code: string
   created_by: string
   created_at: string
   updated_at: string
@@ -212,6 +213,7 @@ export interface TodoListItem {
     estimated_time?: string
     payment_terms?: string
     budget?: number
+    currency?: string
   } | null
   attachments: Array<{id: string; name: string; size: number}> | null
   created_at: string
