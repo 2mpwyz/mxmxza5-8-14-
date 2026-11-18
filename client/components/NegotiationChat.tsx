@@ -25,6 +25,7 @@ import { toast } from "../hooks/use-toast";
 import FileUploadZone, { FileAttachment } from "./FileUploadZone";
 import VoiceRecorder from "./VoiceRecorder";
 import { useFileUpload } from "../hooks/useFileUpload";
+import { formatTaskDeadline, toDeadlineInstant, toDeadlineLocalInput } from "../lib/taskDeadline";
 
 interface KeyTerms {
   price?: number;
@@ -33,6 +34,7 @@ interface KeyTerms {
   category?: string;
   estimatedTime?: string;
   paymentTerms?: string;
+  dueDate?: string;
   [key: string]: string | number | undefined;
 }
 
@@ -73,6 +75,7 @@ const NegotiationChat: React.FC<NegotiationChatProps> = ({
     category: initialProposal.proposed_category || task.category || undefined,
     estimatedTime: initialProposal.proposed_estimated_time || task.estimated_time || undefined,
     paymentTerms: initialProposal.proposed_payment_terms || task.payment_terms || undefined,
+    dueDate: initialProposal.proposed_due_date || task.due_date || undefined,
   });
   const [editingTerms, setEditingTerms] = useState<KeyTerms>({
     price: initialProposal.quoted_price || undefined,
@@ -81,6 +84,7 @@ const NegotiationChat: React.FC<NegotiationChatProps> = ({
     category: initialProposal.proposed_category || task.category || undefined,
     estimatedTime: initialProposal.proposed_estimated_time || task.estimated_time || undefined,
     paymentTerms: initialProposal.proposed_payment_terms || task.payment_terms || undefined,
+    dueDate: initialProposal.proposed_due_date || task.due_date || undefined,
   });
   const [showFinalizationDialog, setShowFinalizationDialog] = useState(false);
   const [isFinalizingTodo, setIsFinalizingTodo] = useState(false);
@@ -257,6 +261,7 @@ const NegotiationChat: React.FC<NegotiationChatProps> = ({
           proposed_category: keyTerms.category,
           proposed_estimated_time: keyTerms.estimatedTime,
           proposed_payment_terms: keyTerms.paymentTerms,
+          proposed_due_date: keyTerms.dueDate ?? null,
         })
         .eq("id", proposalId);
 
@@ -289,6 +294,7 @@ const NegotiationChat: React.FC<NegotiationChatProps> = ({
         const { data: updatedTodo, error: updateError } = await supabase
           .from("todo_list")
           .update({
+            due_date: keyTerms.dueDate ?? null,
             details: {
               // Original task fields (for audit trail)
               category_original: task.category,
@@ -324,7 +330,7 @@ const NegotiationChat: React.FC<NegotiationChatProps> = ({
               title: task.title,
               description: task.description,
               priority: task.priority || "medium",
-              due_date: task.due_date,
+              due_date: keyTerms.dueDate ?? null,
               estimated_hours: keyTerms.estimatedTime
                 ? parseInt(keyTerms.estimatedTime)
                 : null,
@@ -451,6 +457,21 @@ const NegotiationChat: React.FC<NegotiationChatProps> = ({
               </div>
 
               <div>
+                <Label className="text-xs font-semibold">Deadline</Label>
+                <Input
+                  type="datetime-local"
+                  value={editingTerms.dueDate ? toDeadlineLocalInput(editingTerms.dueDate) : ""}
+                  onChange={(e) =>
+                    setEditingTerms((prev) => ({
+                      ...prev,
+                      dueDate: e.target.value ? toDeadlineInstant(e.target.value) : undefined,
+                    }))
+                  }
+                  className="mt-1"
+                />
+              </div>
+
+              <div>
                 <Label className="text-xs font-semibold">Category</Label>
                 <select
                   value={editingTerms.category || ""}
@@ -561,6 +582,20 @@ const NegotiationChat: React.FC<NegotiationChatProps> = ({
                   </div>
                   <p className="text-sm font-semibold text-sheraton-navy">
                     {keyTerms.timeline}
+                  </p>
+                </div>
+              )}
+
+              {keyTerms.dueDate && (
+                <div className="p-3 bg-white rounded-lg border border-sheraton-gold/20">
+                  <div className="flex items-center gap-2 mb-1">
+                    <Clock className="h-4 w-4 text-blue-600" />
+                    <p className="text-xs font-semibold text-gray-500 uppercase">
+                      Deadline
+                    </p>
+                  </div>
+                  <p className="text-sm font-semibold text-sheraton-navy">
+                    {formatTaskDeadline(keyTerms.dueDate)}
                   </p>
                 </div>
               )}
@@ -849,6 +884,12 @@ const NegotiationChat: React.FC<NegotiationChatProps> = ({
                   <div className="flex justify-between text-sm">
                     <span className="font-semibold text-gray-600">Timeline:</span>
                     <span className="text-gray-900">{keyTerms.timeline}</span>
+                  </div>
+                )}
+                {keyTerms.dueDate && (
+                  <div className="flex justify-between text-sm">
+                    <span className="font-semibold text-gray-600">Deadline:</span>
+                    <span className="text-gray-900">{formatTaskDeadline(keyTerms.dueDate)}</span>
                   </div>
                 )}
                 {keyTerms.category && (

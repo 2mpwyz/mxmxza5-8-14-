@@ -191,6 +191,7 @@ export interface TaskProposal {
   proposed_category: string | null
   proposed_estimated_time: string | null
   proposed_payment_terms: string | null
+  proposed_due_date: string | null
   attachments: Array<{id: string; name: string; size: number}> | null
   created_at: string
   updated_at: string
