@@ -6,6 +6,7 @@ import { toast } from "../hooks/use-toast";
 import { FileAttachment } from "../components/FileUploadZone";
 import { useFileUpload } from "../hooks/useFileUpload";
 import { useHotelTenant } from "../lib/hotelTenant";
+import { toDeadlineInstant } from "../lib/taskDeadline";
 import { AppRole, isWorkerRole } from "../lib/roles";
 import TaskResponseModal from "../components/TaskResponseModal";
 
@@ -575,7 +576,7 @@ const TasksPage: React.FC = () => {
         assigned_to: selectedAssignee?.id || null,
         assignee_name: assigneeName,
         assigned_category: formData.assignmentType as "internal" | "external",
-        due_date: formData.dueDate || null,
+        due_date: formData.dueDate ? toDeadlineInstant(formData.dueDate) : null,
         estimated_time: formData.estimatedTime || null,
         payment_terms: formData.paymentTerms || null,
         is_from_complaint: selectedComplaint !== null,

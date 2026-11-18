@@ -15,6 +15,7 @@ import {
 import { Task as TaskType, UserProfile } from "../../../../lib/supabase";
 import TaskChat from "../../../../components/TaskChat";
 import { getPriorityColor, getStatusLabel } from "../../utils/taskDisplay";
+import { formatTaskDeadline } from "../../../../lib/taskDeadline";
 
 interface LiveChatTabProps {
   selectedTask: string | null;
@@ -121,7 +122,7 @@ const LiveChatTab: React.FC<LiveChatTabProps> = ({
                 </p>
                 <p className="font-semibold text-sheraton-navy">
                   {currentTaskData.due_date
-                    ? new Date(currentTaskData.due_date).toLocaleDateString()
+                    ? formatTaskDeadline(currentTaskData.due_date)
                     : "N/A"}
                 </p>
               </div>

@@ -30,6 +30,7 @@ import TodoItem from "../../../../components/TodoItem";
 import { getPriorityColor, getStatusColor, getStatusLabel } from "../../utils/taskDisplay";
 import StatusIcon from "../StatusIcon";
 import { AppRole, isWorkerRole } from "../../../../lib/roles";
+import { formatTaskDeadline } from "../../../../lib/taskDeadline";
 
 const metadataToneByStatus: Record<string, { panel: string; label: string; titleHover: string }> = {
   todo: { panel: "bg-amber-50/70 dark:bg-amber-950/30", label: "text-amber-700 dark:text-amber-300", titleHover: "group-hover:text-amber-700 dark:group-hover:text-amber-300" },
@@ -178,7 +179,7 @@ const TodoListTab: React.FC<TodoListTabProps> = ({
                       {task.due_date && (
                         <div className="min-w-0">
                           <p className={`text-sm font-semibold tracking-wide ${(metadataToneByStatus[task.status] || metadataToneByStatus.default).label}`}>Due Date</p>
-                          <p className="mt-1.5 text-sm font-semibold text-slate-800 dark:text-slate-100">{new Date(task.due_date).toLocaleDateString()}</p>
+                          <p className="mt-1.5 text-sm font-semibold text-slate-800 dark:text-slate-100">{formatTaskDeadline(task.due_date)}</p>
                         </div>
                       )}
                       {(task as any).budget && (
@@ -458,7 +459,7 @@ const TodoListTab: React.FC<TodoListTabProps> = ({
                 {task.due_date && (
                   <div className="min-w-0">
                     <p className={`text-sm font-semibold tracking-wide ${(metadataToneByStatus[task.status] || metadataToneByStatus.default).label}`}>Due Date</p>
-                    <p className="mt-1.5 text-sm font-semibold text-slate-800 dark:text-slate-100">{new Date(task.due_date).toLocaleDateString()}</p>
+                    <p className="mt-1.5 text-sm font-semibold text-slate-800 dark:text-slate-100">{formatTaskDeadline(task.due_date)}</p>
                   </div>
                 )}
                 {task.assignee_name && (

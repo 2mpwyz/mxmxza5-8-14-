@@ -16,6 +16,7 @@ import {
 } from "./ui/select";
 import { Loader, CheckCircle, AlertCircle, Clock } from "lucide-react";
 import { supabase, TodoListItem, WorkerTaskPayment } from "../lib/supabase";
+import { formatTaskDeadline } from "../lib/taskDeadline";
 import { toast } from "../hooks/use-toast";
 import AttachmentList from "./AttachmentList";
 
@@ -247,7 +248,7 @@ export const TodoItem: React.FC<TodoItemProps> = ({
                 Due Date
               </p>
               <p className={`mt-1.5 text-sm font-semibold ${isOverdue ? "text-red-600 dark:text-red-400" : "text-slate-800 dark:text-slate-100"}`}>
-                {new Date(todo.due_date).toLocaleDateString()}
+                {formatTaskDeadline(todo.due_date)}
               </p>
               {isOverdue && (
                 <p className="mt-1 text-xs font-semibold text-red-600 dark:text-red-400">

@@ -15,6 +15,7 @@ import { Badge } from "./ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 import { Loader, CheckCircle, XCircle, MessageSquare } from "lucide-react";
 import { supabase, Task as TaskType } from "../lib/supabase";
+import { formatTaskDeadline } from "../lib/taskDeadline";
 import { toast } from "../hooks/use-toast";
 
 interface TaskResponseModalProps {
@@ -183,7 +184,7 @@ export const TaskResponseModal: React.FC<TaskResponseModalProps> = ({
                       Due Date
                     </p>
                     <p className="font-semibold text-sheraton-navy mt-1">
-                      {new Date(task.due_date).toLocaleDateString()}
+                      {formatTaskDeadline(task.due_date)}
                     </p>
                   </div>
                 )}

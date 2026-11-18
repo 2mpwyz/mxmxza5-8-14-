@@ -253,9 +253,9 @@ const TaskCreationForm: React.FC<TaskCreationFormProps> = ({
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label>Due Date *</Label>
+                <Label>Due Date & Time *</Label>
                 <Input
-                  type="date"
+                  type="datetime-local"
                   value={formData.dueDate}
                   onChange={(e) => onFormChange("dueDate", e.target.value)}
                 />
