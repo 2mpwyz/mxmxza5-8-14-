@@ -16,6 +16,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 import { Loader, CheckCircle, XCircle, MessageSquare } from "lucide-react";
 import { supabase, Task as TaskType } from "../lib/supabase";
 import { formatTaskDeadline } from "../lib/taskDeadline";
+import { formatTaskAmount, getTaskAmount } from "../lib/taskCurrency";
 import DeadlineCountdown from "./DeadlineCountdown";
 import { toast } from "../hooks/use-toast";
 
@@ -202,13 +203,13 @@ export const TaskResponseModal: React.FC<TaskResponseModalProps> = ({
                   </div>
                 )}
 
-                {task.budget && (
+                {getTaskAmount(task) !== null && (
                   <div>
                     <p className="text-xs font-semibold text-gray-500 uppercase">
                       Budget
                     </p>
                     <p className="font-semibold text-green-700 mt-1">
-                      ${parseFloat(task.budget.toString()).toFixed(2)}
+                      {formatTaskAmount(getTaskAmount(task)!, task.currency_code)}
                     </p>
                   </div>
                 )}
@@ -312,7 +313,7 @@ export const TaskResponseModal: React.FC<TaskResponseModalProps> = ({
                   Quoted Price
                 </Label>
                 <div className="flex items-center gap-2 mt-2">
-                  <span className="text-gray-600">$</span>
+                  <span className="text-gray-600">{task.currency_code}</span>
                   <Input
                     id="quoted-price"
                     type="number"

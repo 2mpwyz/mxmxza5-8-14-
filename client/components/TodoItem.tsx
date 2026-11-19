@@ -17,6 +17,7 @@ import {
 import { Loader, CheckCircle, AlertCircle, Clock } from "lucide-react";
 import { supabase, TodoListItem, WorkerTaskPayment } from "../lib/supabase";
 import { formatTaskDeadline } from "../lib/taskDeadline";
+import { formatTaskAmount } from "../lib/taskCurrency";
 import DeadlineCountdown from "./DeadlineCountdown";
 import { toast } from "../hooks/use-toast";
 import AttachmentList from "./AttachmentList";
@@ -266,7 +267,7 @@ export const TodoItem: React.FC<TodoItemProps> = ({
                 Budget
               </p>
               <p className="mt-1.5 text-sm font-semibold text-emerald-700 dark:text-emerald-300">
-                ${todo.details.budget.toFixed(2)}
+                {formatTaskAmount(todo.details.budget, todo.details.currency)}
               </p>
             </div>
           )}

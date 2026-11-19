@@ -20,14 +20,16 @@ import {
   DialogFooter,
 } from "./ui/dialog";
 import { CheckCircle, XCircle, MessageCircle, Loader } from "lucide-react";
-import { supabase, TaskProposal } from "../lib/supabase";
+import { supabase, Task, TaskProposal } from "../lib/supabase";
 import { toast } from "../hooks/use-toast";
 import { formatTaskDeadline, toDeadlineInstant } from "../lib/taskDeadline";
+import { formatTaskAmount } from "../lib/taskCurrency";
 
 interface ManagerProposalReviewProps {
   proposal: TaskProposal | null;
   taskTitle: string;
   workerName: string;
+  task?: Task;
   onProposalUpdated?: () => void;
 }
 
@@ -37,6 +39,7 @@ export const ManagerProposalReview: React.FC<ManagerProposalReviewProps> = ({
   proposal,
   taskTitle,
   workerName,
+  task,
   onProposalUpdated,
 }) => {
   const [selectedAction, setSelectedAction] = useState<ReviewAction | null>(null);
@@ -158,7 +161,7 @@ export const ManagerProposalReview: React.FC<ManagerProposalReviewProps> = ({
                   Quoted Price
                 </p>
                 <p className="text-2xl font-bold text-green-700">
-                  ${proposal.quoted_price.toFixed(2)}
+                  {formatTaskAmount(proposal.quoted_price, task?.currency_code)}
                 </p>
               </div>
             )}
@@ -297,7 +300,7 @@ export const ManagerProposalReview: React.FC<ManagerProposalReviewProps> = ({
                     Counter Price (optional)
                   </Label>
                   <div className="flex items-center gap-2 mt-2">
-                    <span className="text-gray-600">$</span>
+                    <span className="text-gray-600">{task?.currency_code}</span>
                     <Input
                       id="counter-price"
                       type="number"

@@ -3,6 +3,7 @@ import { Star } from "lucide-react";
 import { Textarea } from "../../../../components/ui/textarea";
 import { supabase, Task as TaskType, TaskReport, TaskChecklist, TaskChecklistItem, TaskReportChecklistItem, TaskEvidenceSubmission, TaskIssue, TaskEvidenceRequirement } from "../../../../lib/supabase";
 import { toast } from "../../../../hooks/use-toast";
+import { formatTaskAmount, getTaskAmount } from "../../../../lib/taskCurrency";
 import EvidenceGallery from "./EvidenceGallery";
 
 interface ManagerReportViewProps {
@@ -178,7 +179,7 @@ const ManagerReportView: React.FC<ManagerReportViewProps> = ({
           </div>
           <div>
             <p className="text-gray-600">Budget</p>
-            <p className="font-medium text-gray-900">${task.budget}</p>
+            <p className="font-medium text-gray-900">{getTaskAmount(task) === null ? "Not set" : formatTaskAmount(getTaskAmount(task)!, task.currency_code)}</p>
           </div>
         </div>
       </div>

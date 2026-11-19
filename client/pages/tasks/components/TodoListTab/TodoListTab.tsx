@@ -31,6 +31,7 @@ import { getPriorityColor, getStatusColor, getStatusLabel } from "../../utils/ta
 import StatusIcon from "../StatusIcon";
 import { AppRole, isWorkerRole } from "../../../../lib/roles";
 import { formatTaskDeadline } from "../../../../lib/taskDeadline";
+import { formatTaskAmount, getTaskAmount } from "../../../../lib/taskCurrency";
 import DeadlineCountdown from "../../../../components/DeadlineCountdown";
 
 const metadataToneByStatus: Record<string, { panel: string; label: string; titleHover: string }> = {
@@ -175,7 +176,7 @@ const TodoListTab: React.FC<TodoListTabProps> = ({
                     {task.description}
                   </p>
 
-                  {(task.due_date || (task as any).budget) && (
+                  {(task.due_date || getTaskAmount(task) !== null) && (
                     <div className={`mt-4 grid grid-cols-2 gap-x-5 gap-y-4 rounded-xl ${(metadataToneByStatus[task.status] || metadataToneByStatus.default).panel} p-4`}>
                       {task.due_date && (
                         <div className="min-w-0">
@@ -184,10 +185,10 @@ const TodoListTab: React.FC<TodoListTabProps> = ({
                           <DeadlineCountdown dueDate={task.due_date} done={task.status === "completed"} className="mt-1" />
                         </div>
                       )}
-                      {(task as any).budget && (
+                      {getTaskAmount(task) !== null && (
                         <div className="min-w-0">
                           <p className={`text-sm font-semibold tracking-wide ${(metadataToneByStatus[task.status] || metadataToneByStatus.default).label}`}>Budget</p>
-                          <p className="mt-1.5 text-sm font-semibold text-emerald-700 dark:text-emerald-300">${(task as any).budget.toFixed(2)}</p>
+                          <p className="mt-1.5 text-sm font-semibold text-emerald-700 dark:text-emerald-300">{formatTaskAmount(getTaskAmount(task)!, task.currency_code)}</p>
                         </div>
                       )}
                     </div>
@@ -404,6 +405,7 @@ const TodoListTab: React.FC<TodoListTabProps> = ({
                     proposal={proposal}
                     taskTitle={task?.title || "Unknown Task"}
                     workerName={task?.assignee_name || "Unknown Worker"}
+                    task={task}
                     onProposalUpdated={onProposalUpdated}
                   />
                 );
@@ -483,10 +485,10 @@ const TodoListTab: React.FC<TodoListTabProps> = ({
                     <p className="mt-1.5 text-sm font-semibold text-slate-800 dark:text-slate-100">{task.estimated_time}</p>
                   </div>
                 )}
-                {(task as any).budget && (
+                {getTaskAmount(task) !== null && (
                   <div className="min-w-0">
                     <p className={`text-sm font-semibold tracking-wide ${(metadataToneByStatus[task.status] || metadataToneByStatus.default).label}`}>Budget</p>
-                    <p className="mt-1.5 text-sm font-semibold text-emerald-700 dark:text-emerald-300">${parseFloat((task as any).budget).toFixed(2)}</p>
+                    <p className="mt-1.5 text-sm font-semibold text-emerald-700 dark:text-emerald-300">{formatTaskAmount(getTaskAmount(task)!, task.currency_code)}</p>
                   </div>
                 )}
                 {task.assigned_category && (
