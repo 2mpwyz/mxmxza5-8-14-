@@ -39,7 +39,9 @@ const ManagerReportView: React.FC<ManagerReportViewProps> = ({
   const [isReviewLoading, setIsReviewLoading] = useState(false);
   const [isReviewSaving, setIsReviewSaving] = useState(false);
   const [approvalFxIssue, setApprovalFxIssue] = useState<string | null>(null);
+  const [settlementAction, setSettlementAction] = useState<"keep" | "refresh" | "edit">("keep");
   const [approvalManualRate, setApprovalManualRate] = useState("");
+  const isConvertedSettlement = !!task.settlement_currency_code && task.settlement_currency_code !== task.currency_code;
   const hasApprovedReport = taskReport?.task_id === task.id && taskReport.status === "approved";
 
   useEffect(() => {
@@ -115,9 +117,10 @@ const ManagerReportView: React.FC<ManagerReportViewProps> = ({
   const handleApproveTask = async () => {
     if (!taskReport || !task.assigned_to) return;
 
-    const manualRate = approvalManualRate.trim() === "" ? null : Number(approvalManualRate);
-    if (manualRate !== null && !(Number.isFinite(manualRate) && manualRate > 0)) {
-      toast({ title: "Invalid rate", description: "The manual FX rate must be greater than zero.", variant: "destructive" });
+    const action = isConvertedSettlement ? settlementAction : "keep";
+    const editedRate = action === "edit" ? Number(approvalManualRate) : null;
+    if (action === "edit" && !(Number.isFinite(editedRate) && editedRate! > 0)) {
+      toast({ title: "Invalid rate", description: "The edited settlement rate must be greater than zero.", variant: "destructive" });
       return;
     }
 
@@ -125,7 +128,8 @@ const ManagerReportView: React.FC<ManagerReportViewProps> = ({
     try {
       const { data: pointsAwarded, error } = await supabase.rpc("approve_task_report_and_award_points", {
         target_report_id: taskReport.id,
-        p_manual_fx_rate: manualRate,
+        p_settlement_action: action,
+        p_settlement_fx_rate: editedRate,
       });
       if (error) {
         if (error.message.startsWith("FX_RATE_")) {
@@ -138,6 +142,7 @@ const ManagerReportView: React.FC<ManagerReportViewProps> = ({
 
       setApprovalFxIssue(null);
       setApprovalManualRate("");
+      setSettlementAction("keep");
       toast({
         title: "Success",
         description: Number(pointsAwarded) > 0
@@ -351,27 +356,43 @@ const ManagerReportView: React.FC<ManagerReportViewProps> = ({
           <p className="text-gray-700 mb-4">
             All work appears complete. Review the report, checklist, and evidence above, then approve to mark the task as complete.
           </p>
-          {approvalFxIssue && (
-            <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-800 space-y-2">
-              <p>{approvalFxIssue}</p>
-              <label htmlFor="approval-manual-rate" className="block font-medium">
-                Manual exchange rate (units of worker Books currency per 1 hotel currency unit)
-              </label>
-              <input
-                id="approval-manual-rate"
-                type="number"
-                min="0"
-                step="any"
-                value={approvalManualRate}
-                onChange={(event) => setApprovalManualRate(event.target.value)}
-                placeholder="e.g. 0.00027"
+          {isConvertedSettlement && (
+            <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg text-sm text-blue-900 space-y-2">
+              <p className="font-medium">
+                Settlement: {task.settlement_currency_code} at 1 {task.currency_code} = {task.settlement_fx_rate === null ? "?" : Number(task.settlement_fx_rate).toLocaleString(undefined, { maximumFractionDigits: 8 })} {task.settlement_currency_code}
+                {task.settlement_fx_rate_source ? ` (${task.settlement_fx_rate_source.replace(/_/g, " ")})` : ""}
+              </p>
+              <label htmlFor="settlement-action" className="block font-medium">Exchange rate at approval</label>
+              <select
+                id="settlement-action"
+                value={settlementAction}
+                onChange={(event) => setSettlementAction(event.target.value as "keep" | "refresh" | "edit")}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-white"
-              />
+              >
+                <option value="keep">Keep the agreed rate</option>
+                <option value="refresh">Refresh to the current stored rate</option>
+                <option value="edit">Enter a different rate</option>
+              </select>
+              {settlementAction === "edit" && (
+                <input
+                  type="number"
+                  min="0"
+                  step="any"
+                  value={approvalManualRate}
+                  onChange={(event) => setApprovalManualRate(event.target.value)}
+                  placeholder="Settlement units per 1 task currency unit"
+                  aria-label="Edited settlement rate"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-white"
+                />
+              )}
             </div>
+          )}
+          {approvalFxIssue && (
+            <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-800">{approvalFxIssue}</div>
           )}
           <button
             onClick={handleApproveTask}
-            disabled={isSubmitting || (approvalFxIssue !== null && approvalManualRate.trim() === "")}
+            disabled={isSubmitting || (isConvertedSettlement && settlementAction === "edit" && approvalManualRate.trim() === "")}
             className="w-full px-6 py-3 bg-sheraton-gold text-sheraton-navy rounded-lg font-semibold hover:bg-opacity-90 disabled:opacity-50"
           >
             {isSubmitting ? "Approving..." : "✓ Approve & Complete Task"}
