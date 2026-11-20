@@ -25,6 +25,8 @@ import { toast } from "../hooks/use-toast";
 import FileUploadZone, { FileAttachment } from "./FileUploadZone";
 import VoiceRecorder from "./VoiceRecorder";
 import { useFileUpload } from "../hooks/useFileUpload";
+import { formatTaskDeadline, toDeadlineInstant, toDeadlineLocalInput } from "../lib/taskDeadline";
+import { formatTaskAmount } from "../lib/taskCurrency";
 
 interface KeyTerms {
   price?: number;
@@ -33,8 +35,19 @@ interface KeyTerms {
   category?: string;
   estimatedTime?: string;
   paymentTerms?: string;
+  dueDate?: string;
   [key: string]: string | number | undefined;
 }
+
+const termsFromProposal = (proposal: TaskProposal, task: Task): KeyTerms => ({
+  price: proposal.quoted_price || undefined,
+  timeline: proposal.proposed_timeline || undefined,
+  notes: proposal.proposal_notes || undefined,
+  category: proposal.proposed_category || task.category || undefined,
+  estimatedTime: proposal.proposed_estimated_time || task.estimated_time || undefined,
+  paymentTerms: proposal.proposed_payment_terms || task.payment_terms || undefined,
+  dueDate: proposal.proposed_due_date || task.due_date || undefined,
+});
 
 interface NegotiationChatProps {
   proposalId: string;
@@ -66,22 +79,8 @@ const NegotiationChat: React.FC<NegotiationChatProps> = ({
   const [attachments, setAttachments] = useState<FileAttachment[]>([]);
   const [showVoiceRecorder, setShowVoiceRecorder] = useState(false);
   const [isEditingTerms, setIsEditingTerms] = useState(false);
-  const [keyTerms, setKeyTerms] = useState<KeyTerms>({
-    price: initialProposal.quoted_price || undefined,
-    timeline: initialProposal.proposed_timeline || undefined,
-    notes: initialProposal.proposal_notes || undefined,
-    category: initialProposal.proposed_category || task.category || undefined,
-    estimatedTime: initialProposal.proposed_estimated_time || task.estimated_time || undefined,
-    paymentTerms: initialProposal.proposed_payment_terms || task.payment_terms || undefined,
-  });
-  const [editingTerms, setEditingTerms] = useState<KeyTerms>({
-    price: initialProposal.quoted_price || undefined,
-    timeline: initialProposal.proposed_timeline || undefined,
-    notes: initialProposal.proposal_notes || undefined,
-    category: initialProposal.proposed_category || task.category || undefined,
-    estimatedTime: initialProposal.proposed_estimated_time || task.estimated_time || undefined,
-    paymentTerms: initialProposal.proposed_payment_terms || task.payment_terms || undefined,
-  });
+  const keyTerms = termsFromProposal(initialProposal, task);
+  const [editingTerms, setEditingTerms] = useState<KeyTerms>(keyTerms);
   const [showFinalizationDialog, setShowFinalizationDialog] = useState(false);
   const [isFinalizingTodo, setIsFinalizingTodo] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -153,12 +152,33 @@ const NegotiationChat: React.FC<NegotiationChatProps> = ({
     setAttachments((prev) => prev.filter((a) => a.attachmentId !== id));
   };
 
-  const handleSaveTermsEdits = () => {
-    setKeyTerms(editingTerms);
+  const handleSaveTermsEdits = async () => {
+    const { error } = await supabase
+      .from("task_proposals")
+      .update({
+        quoted_price: editingTerms.price ?? null,
+        proposed_timeline: editingTerms.timeline ?? null,
+        proposal_notes: editingTerms.notes ?? null,
+        proposed_category: editingTerms.category ?? null,
+        proposed_estimated_time: editingTerms.estimatedTime ?? null,
+        proposed_payment_terms: editingTerms.paymentTerms ?? null,
+        proposed_due_date: editingTerms.dueDate ?? null,
+      })
+      .eq("id", proposalId);
+
+    if (error) {
+      toast({
+        title: "Error",
+        description: "Failed to save key terms",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setIsEditingTerms(false);
     toast({
       title: "Key terms updated",
-      description: "Changes will be saved when you finalize the negotiation.",
+      description: "The latest terms are now shown to both parties.",
     });
   };
 
@@ -246,18 +266,22 @@ const NegotiationChat: React.FC<NegotiationChatProps> = ({
         throw new Error("User profile not found. Please refresh and try again.");
       }
 
-      // Update proposal status to accepted with ALL negotiated terms
+      // Read the stored proposal so the agreed terms reflect the latest counter-offer or edit
+      const { data: latestProposal, error: latestError } = await supabase
+        .from("task_proposals")
+        .select("*")
+        .eq("id", proposalId)
+        .single();
+
+      if (latestError || !latestProposal) {
+        throw new Error("Could not load the latest negotiated terms. Please try again.");
+      }
+
+      const terms = termsFromProposal(latestProposal, task);
+
       const { error: proposalError } = await supabase
         .from("task_proposals")
-        .update({
-          status: "accepted",
-          quoted_price: keyTerms.price,
-          proposed_timeline: keyTerms.timeline,
-          proposal_notes: keyTerms.notes,
-          proposed_category: keyTerms.category,
-          proposed_estimated_time: keyTerms.estimatedTime,
-          proposed_payment_terms: keyTerms.paymentTerms,
-        })
+        .update({ status: "accepted" })
         .eq("id", proposalId);
 
       if (proposalError) throw proposalError;
@@ -273,6 +297,23 @@ const NegotiationChat: React.FC<NegotiationChatProps> = ({
         throw new Error("Worker ID is missing. Cannot create task.");
       }
 
+      const agreedDetails = {
+        // Original task fields (for audit trail)
+        category_original: task.category,
+        estimated_time_original: task.estimated_time,
+        payment_terms_original: task.payment_terms,
+        budget_original: task.budget,
+
+        // Final agreed terms
+        category: terms.category || task.category,
+        estimated_time: terms.estimatedTime || task.estimated_time,
+        payment_terms: terms.paymentTerms || task.payment_terms,
+        budget: terms.price,
+        timeline: terms.timeline,
+        negotiation_notes: terms.notes,
+        currency: task.currency_code,
+      };
+
       // Check if a todo already exists for this task to prevent duplicates
       // (could exist from old task_responses flow)
       const { data: existingTodos } = await supabase
@@ -285,25 +326,11 @@ const NegotiationChat: React.FC<NegotiationChatProps> = ({
       let todoError;
 
       if (existingTodos && existingTodos.length > 0) {
-        // Update existing todo with ALL negotiated terms
         const { data: updatedTodo, error: updateError } = await supabase
           .from("todo_list")
           .update({
-            details: {
-              // Original task fields (for audit trail)
-              category_original: task.category,
-              estimated_time_original: task.estimated_time,
-              payment_terms_original: task.payment_terms,
-              budget_original: task.budget,
-
-              // FINAL AGREED TERMS ✅
-              category: keyTerms.category || task.category,              // Negotiated or original
-              estimated_time: keyTerms.estimatedTime || task.estimated_time,  // Negotiated or original
-              payment_terms: keyTerms.paymentTerms || task.payment_terms,     // Negotiated or original
-              budget: keyTerms.price,                                    // AGREED PRICE ✅
-              timeline: keyTerms.timeline,                               // AGREED TIMELINE ✅
-              negotiation_notes: keyTerms.notes,                         // AGREED NOTES ✅
-            },
+            due_date: terms.dueDate ?? null,
+            details: agreedDetails,
           })
           .eq("id", existingTodos[0].id)
           .select("id")
@@ -312,7 +339,6 @@ const NegotiationChat: React.FC<NegotiationChatProps> = ({
         todoData = updatedTodo;
         todoError = updateError;
       } else {
-        // Create new todo with ALL agreed terms
         // CRITICAL: worker_id MUST be from user_profiles.id, NOT auth.users.id
         const { data: newTodo, error: createError } = await supabase
           .from("todo_list")
@@ -324,25 +350,11 @@ const NegotiationChat: React.FC<NegotiationChatProps> = ({
               title: task.title,
               description: task.description,
               priority: task.priority || "medium",
-              due_date: task.due_date,
-              estimated_hours: keyTerms.estimatedTime
-                ? parseInt(keyTerms.estimatedTime)
+              due_date: terms.dueDate ?? null,
+              estimated_hours: terms.estimatedTime
+                ? parseInt(terms.estimatedTime)
                 : null,
-              details: {
-                // Original task fields (for audit trail)
-                category_original: task.category,
-                estimated_time_original: task.estimated_time,
-                payment_terms_original: task.payment_terms,
-                budget_original: task.budget,
-
-                // FINAL AGREED TERMS ✅
-                category: keyTerms.category || task.category,              // Negotiated or original
-                estimated_time: keyTerms.estimatedTime || task.estimated_time,  // Negotiated or original
-                payment_terms: keyTerms.paymentTerms || task.payment_terms,     // Negotiated or original
-                budget: keyTerms.price,                                    // AGREED PRICE ✅
-                timeline: keyTerms.timeline,                               // AGREED TIMELINE ✅
-                negotiation_notes: keyTerms.notes,                         // AGREED NOTES ✅
-              },
+              details: agreedDetails,
               attachments: attachments.length > 0 ? attachments.map((a) => ({
                 id: a.attachmentId,
                 name: a.originalName,
@@ -417,7 +429,7 @@ const NegotiationChat: React.FC<NegotiationChatProps> = ({
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <Label className="text-xs font-semibold">Price ($)</Label>
+                  <Label className="text-xs font-semibold">Price ({task.currency_code})</Label>
                   <Input
                     type="number"
                     placeholder="0.00"
@@ -448,6 +460,21 @@ const NegotiationChat: React.FC<NegotiationChatProps> = ({
                     className="mt-1"
                   />
                 </div>
+              </div>
+
+              <div>
+                <Label className="text-xs font-semibold">Deadline</Label>
+                <Input
+                  type="datetime-local"
+                  value={editingTerms.dueDate ? toDeadlineLocalInput(editingTerms.dueDate) : ""}
+                  onChange={(e) =>
+                    setEditingTerms((prev) => ({
+                      ...prev,
+                      dueDate: e.target.value ? toDeadlineInstant(e.target.value) : undefined,
+                    }))
+                  }
+                  className="mt-1"
+                />
               </div>
 
               <div>
@@ -546,7 +573,7 @@ const NegotiationChat: React.FC<NegotiationChatProps> = ({
                     </p>
                   </div>
                   <p className="text-lg font-bold text-green-700">
-                    ${keyTerms.price.toFixed(2)}
+                    {formatTaskAmount(keyTerms.price, task.currency_code)}
                   </p>
                 </div>
               )}
@@ -561,6 +588,20 @@ const NegotiationChat: React.FC<NegotiationChatProps> = ({
                   </div>
                   <p className="text-sm font-semibold text-sheraton-navy">
                     {keyTerms.timeline}
+                  </p>
+                </div>
+              )}
+
+              {keyTerms.dueDate && (
+                <div className="p-3 bg-white rounded-lg border border-sheraton-gold/20">
+                  <div className="flex items-center gap-2 mb-1">
+                    <Clock className="h-4 w-4 text-blue-600" />
+                    <p className="text-xs font-semibold text-gray-500 uppercase">
+                      Deadline
+                    </p>
+                  </div>
+                  <p className="text-sm font-semibold text-sheraton-navy">
+                    {formatTaskDeadline(keyTerms.dueDate)}
                   </p>
                 </div>
               )}
@@ -841,7 +882,7 @@ const NegotiationChat: React.FC<NegotiationChatProps> = ({
                   <div className="flex justify-between text-sm">
                     <span className="font-semibold text-gray-600">Price:</span>
                     <span className="text-green-700 font-bold">
-                      ${keyTerms.price.toFixed(2)}
+                      {formatTaskAmount(keyTerms.price, task.currency_code)}
                     </span>
                   </div>
                 )}
@@ -849,6 +890,12 @@ const NegotiationChat: React.FC<NegotiationChatProps> = ({
                   <div className="flex justify-between text-sm">
                     <span className="font-semibold text-gray-600">Timeline:</span>
                     <span className="text-gray-900">{keyTerms.timeline}</span>
+                  </div>
+                )}
+                {keyTerms.dueDate && (
+                  <div className="flex justify-between text-sm">
+                    <span className="font-semibold text-gray-600">Deadline:</span>
+                    <span className="text-gray-900">{formatTaskDeadline(keyTerms.dueDate)}</span>
                   </div>
                 )}
                 {keyTerms.category && (

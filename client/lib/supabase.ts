@@ -132,6 +132,7 @@ export interface Task {
   is_from_complaint: boolean
   budget: number | null
   final_amount: number | null
+  currency_code: string
   created_by: string
   created_at: string
   updated_at: string
@@ -191,6 +192,7 @@ export interface TaskProposal {
   proposed_category: string | null
   proposed_estimated_time: string | null
   proposed_payment_terms: string | null
+  proposed_due_date: string | null
   attachments: Array<{id: string; name: string; size: number}> | null
   created_at: string
   updated_at: string
@@ -211,6 +213,7 @@ export interface TodoListItem {
     estimated_time?: string
     payment_terms?: string
     budget?: number
+    currency?: string
   } | null
   attachments: Array<{id: string; name: string; size: number}> | null
   created_at: string
@@ -297,7 +300,7 @@ export interface TaskEvidenceSubmission {
   worker_id: string
   evidence_type: 'photo' | 'video' | 'document' | 'signature'
   attachment_id: string
-  attachments?: Pick<Attachment, "b2_url" | "file_type" | "original_name" | "file_size"> | null
+  attachments?: Pick<Attachment, "filename" | "b2_url" | "file_type" | "original_name" | "file_size"> | null
   description: string | null
   submitted_at: string
   approved_at: string | null

@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { supabase, Task as TaskType, WorkerTaskPayment } from "../../../../lib/supabase";
 import { toast } from "../../../../hooks/use-toast";
+import { formatTaskAmount } from "../../../../lib/taskCurrency";
 
 const PAYMENT_METHODS: Array<{ value: WorkerTaskPayment["payment_method"]; label: string }> = [
   { value: "bank_transfer", label: "Bank transfer" },
@@ -89,7 +90,7 @@ const TaskPaymentPanel: React.FC<TaskPaymentPanelProps> = ({ task }) => {
       <div className="mb-4 text-sm">
         <p className="text-gray-600">Agreed amount</p>
         <p className="font-medium text-gray-900">
-          {hasAgreedAmount ? agreedAmount.toLocaleString() : "No agreed amount on this task"}
+          {hasAgreedAmount ? formatTaskAmount(agreedAmount, task.currency_code) : "No agreed amount on this task"}
         </p>
       </div>
 

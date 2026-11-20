@@ -15,6 +15,9 @@ import {
 import { Task as TaskType, UserProfile } from "../../../../lib/supabase";
 import TaskChat from "../../../../components/TaskChat";
 import { getPriorityColor, getStatusLabel } from "../../utils/taskDisplay";
+import { formatTaskDeadline } from "../../../../lib/taskDeadline";
+import { formatTaskAmount, getTaskAmount } from "../../../../lib/taskCurrency";
+import DeadlineCountdown from "../../../../components/DeadlineCountdown";
 
 interface LiveChatTabProps {
   selectedTask: string | null;
@@ -121,9 +124,12 @@ const LiveChatTab: React.FC<LiveChatTabProps> = ({
                 </p>
                 <p className="font-semibold text-sheraton-navy">
                   {currentTaskData.due_date
-                    ? new Date(currentTaskData.due_date).toLocaleDateString()
+                    ? formatTaskDeadline(currentTaskData.due_date)
                     : "N/A"}
                 </p>
+                {currentTaskData.due_date && (
+                  <DeadlineCountdown dueDate={currentTaskData.due_date} done={currentTaskData.status === "completed"} className="mt-1" />
+                )}
               </div>
 
               <div>
@@ -146,13 +152,13 @@ const LiveChatTab: React.FC<LiveChatTabProps> = ({
                 </div>
               )}
 
-              {(currentTaskData as any).budget && (
+              {getTaskAmount(currentTaskData) !== null && (
                 <div>
                   <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
                     Budget
                   </p>
                   <p className="font-semibold text-green-700">
-                    ${parseFloat((currentTaskData as any).budget).toFixed(2)}
+                    {formatTaskAmount(getTaskAmount(currentTaskData)!, currentTaskData.currency_code)}
                   </p>
                 </div>
               )}

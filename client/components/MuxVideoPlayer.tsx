@@ -5,6 +5,14 @@ import { supabase } from "../lib/supabase";
 
 const MuxPlayer = lazy(() => import("@mux/mux-player-react"));
 
+const saveAspectRatio = async (filename: string, aspectRatio: number) => {
+  await supabase
+    .from("video_uploads")
+    .update({ aspect_ratio: aspectRatio })
+    .eq("filename", filename)
+    .is("aspect_ratio", null);
+};
+
 const formatVideoTime = (time: number) => {
   const totalSeconds = Math.floor(Math.max(0, Number.isFinite(time) ? time : 0));
   const hours = Math.floor(totalSeconds / 3600);
@@ -50,6 +58,7 @@ export const MuxVideoPlayer: React.FC<MuxVideoPlayerProps> = ({
   const [duration, setDuration] = useState(0);
   const [currentTime, setCurrentTime] = useState(0);
   const [hasEnteredLoadRange, setHasEnteredLoadRange] = useState(false);
+  const [manifestChecked, setManifestChecked] = useState(false);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const isMountedRef = useRef(true);
   const muxPlayerRef = useRef<MuxPlayerElement | null>(null);
@@ -105,11 +114,15 @@ export const MuxVideoPlayer: React.FC<MuxVideoPlayerProps> = ({
         } else if (filename) {
           const { data: video } = await supabase
             .from("video_uploads")
-            .select("playback_id, status")
+            .select("playback_id, status, aspect_ratio")
             .eq("filename", filename)
             .maybeSingle();
           nextPlaybackId = video?.playback_id || null;
           status = video?.status || null;
+          const storedAspectRatio = video?.aspect_ratio;
+          if (storedAspectRatio && Number.isFinite(storedAspectRatio) && storedAspectRatio > 0) {
+            setAspectRatio(storedAspectRatio);
+          }
         }
 
         if (!isMountedRef.current) return;
@@ -140,20 +153,47 @@ export const MuxVideoPlayer: React.FC<MuxVideoPlayerProps> = ({
     };
   }, [attachmentId, filename, hasEnteredLoadRange, initialAspectRatio, initialPlaybackId, initialVideoStatus]);
 
+  useEffect(() => {
+    if (!hasEnteredLoadRange || !playbackId || aspectRatio !== null) return;
+    let isActive = true;
+    window.fetch(`https://stream.mux.com/${encodeURIComponent(playbackId)}.m3u8`)
+      .then((response) => (response.ok ? response.text() : ""))
+      .then((manifest) => {
+        if (!isActive) return;
+        const resolution = manifest.match(/RESOLUTION=(\d+)x(\d+)/);
+        if (resolution) {
+          const ratio = Number(resolution[1]) / Number(resolution[2]);
+          setAspectRatio(ratio);
+          onAspectRatioChange?.(ratio);
+          if (filename) void saveAspectRatio(filename, ratio);
+        }
+        setManifestChecked(true);
+      })
+      .catch(() => {
+        if (isActive) setManifestChecked(true);
+      });
+    return () => {
+      isActive = false;
+    };
+  }, [aspectRatio, filename, hasEnteredLoadRange, playbackId]);
+
+  const isAspectRatioPending = aspectRatio === null && !manifestChecked;
+  const isBlankPending = isAspectRatioPending && !overlay;
+  const displayAspectRatio = aspectRatio ?? 16 / 9;
   const isPortrait = aspectRatio !== null && aspectRatio < 1;
   const isImmersivePortrait = presentation === "immersive" && isPortrait;
   const isMobileImmersiveFrame = presentation === "immersive" && viewportWidth < 768;
   const frameStyle: React.CSSProperties = presentation === "immersive"
     ? isMobileImmersiveFrame || isImmersivePortrait
-      ? { aspectRatio: aspectRatio ?? undefined, width: "100%", maxWidth: "100%" }
+      ? { aspectRatio: displayAspectRatio, width: "100%", maxWidth: "100%" }
       : {
-            aspectRatio: aspectRatio ?? undefined,
+            aspectRatio: displayAspectRatio,
             width: "100%",
             maxHeight: "68svh",
             maxWidth: aspectRatio !== null ? `min(100%, calc(68svh * ${aspectRatio}))` : "100%",
           }
     : {
-        aspectRatio: aspectRatio ?? undefined,
+        aspectRatio: displayAspectRatio,
         width: isPortrait && aspectRatio !== null ? `${Math.min(448, viewportHeight * 0.7 * aspectRatio)}px` : "100%",
         maxHeight: "70svh",
         maxWidth: isPortrait ? "100%" : aspectRatio !== null ? `min(100%, calc(70svh * ${aspectRatio}))` : "100%",
@@ -167,9 +207,12 @@ export const MuxVideoPlayer: React.FC<MuxVideoPlayerProps> = ({
   } as React.CSSProperties & { [key: `--${string}`]: string | undefined };
   const isDesktopMinimalControls = controlsMode === "minimal" && viewportWidth >= 768;
   const isMobileMinimalControls = controlsMode === "minimal" && viewportWidth < 768;
-  const frameClass = `${presentation === "immersive"
-    ? "relative w-full overflow-hidden bg-black"
-    : "relative mx-auto w-full overflow-hidden rounded-xl bg-black shadow-md"} ${isDesktopMinimalControls ? "group" : ""}`;
+  const frameClass = [
+    presentation === "immersive" ? "relative w-full overflow-hidden" : "relative mx-auto w-full overflow-hidden rounded-xl",
+    !isBlankPending && "bg-black",
+    presentation !== "immersive" && !isBlankPending && "shadow-md",
+    isDesktopMinimalControls && "group",
+  ].filter(Boolean).join(" ");
   const showOverlay = overlayOnlyOnMobilePortrait
     ? presentation === "immersive" && isPortrait && viewportWidth < 768
     : !(presentation === "immersive" && isPortrait && viewportWidth >= 768);
@@ -280,7 +323,7 @@ export const MuxVideoPlayer: React.FC<MuxVideoPlayerProps> = ({
         togglePlayback();
       } : undefined}
     >
-      {playbackId && hasEnteredLoadRange && (
+      {playbackId && hasEnteredLoadRange && (aspectRatio !== null || manifestChecked) && (
         <Suspense fallback={null}>
           <MuxPlayer
             ref={muxPlayerRef}
@@ -343,6 +386,37 @@ export const MuxVideoPlayer: React.FC<MuxVideoPlayerProps> = ({
       {minimalControls}
       {showOverlay && overlay}
     </div>
+  );
+};
+
+export const MuxVideoThumbnail: React.FC<{ filename: string; className?: string }> = ({ filename, className }) => {
+  const [playbackId, setPlaybackId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!filename) return;
+    let isActive = true;
+    supabase
+      .from("video_uploads")
+      .select("playback_id, status")
+      .eq("filename", filename)
+      .maybeSingle()
+      .then(({ data }) => {
+        if (isActive && data?.status === "ready" && data.playback_id) setPlaybackId(data.playback_id);
+      });
+    return () => {
+      isActive = false;
+    };
+  }, [filename]);
+
+  if (!playbackId) return <div className={`bg-black ${className ?? ""}`} />;
+
+  return (
+    <img
+      src={`https://image.mux.com/${encodeURIComponent(playbackId)}/thumbnail.jpg?time=1&width=640`}
+      alt=""
+      loading="lazy"
+      className={className}
+    />
   );
 };
 

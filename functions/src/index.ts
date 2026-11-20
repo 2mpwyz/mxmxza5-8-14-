@@ -185,7 +185,7 @@ function isValidEmail(value: string | null | undefined): value is string {
 
 async function createInvoicePdf(invoiceId: string, documentKind: "invoice" | "receipt"): Promise<InvoiceDocument> {
   const client = supabase();
-  const { data: invoice, error: invoiceError } = await client.from("books_invoices").select("id,invoice_number,issue_date,due_date,currency_code,subtotal,tax_amount,other_charges,total_due,organization_id,contact_id,invoice_storage_key,receipt_storage_key,notes,buyer_tax_id").eq("id", invoiceId).single();
+  const { data: invoice, error: invoiceError } = await client.from("books_invoices").select("id,invoice_number,issue_date,due_date,currency_code,subtotal,tax_amount,tax_rate_percentage,other_charges,total_due,organization_id,contact_id,invoice_storage_key,receipt_storage_key,notes,buyer_tax_id").eq("id", invoiceId).single();
   if (invoiceError || !invoice) throw invoiceError || new Error("Invoice not found");
   if (!invoice.contact_id) throw new Error("Invoice has no customer contact");
   const { data: loyaltyData, error: loyaltyError } = await client.rpc("get_paid_invoice_loyalty_receipt", { target_invoice_id: invoice.id });
@@ -210,6 +210,7 @@ async function createInvoicePdf(invoiceId: string, documentKind: "invoice" | "re
   const menuServiceFee = Number(menuCharges?.data?.service_fee ?? 0);
   const menuTip = Number(menuCharges?.data?.tip_amount ?? 0);
   let vatAmount: number | null = null;
+  let vatInclusiveNet: number | null = null;
   let vatRatePercentage: number | null = null;
   if (isVatInclusiveSale) {
     const { data: vatRate, error: vatRateError } = await client.rpc("books_confirmed_invoice_vat_rate", {
@@ -226,6 +227,7 @@ async function createInvoicePdf(invoiceId: string, documentKind: "invoice" | "re
       const gross = Number(invoice.subtotal) + Number(invoice.tax_amount) + menuServiceFee;
       const net = Math.round((gross / (1 + Number(vatRate) / 100)) * factor) / factor;
       vatAmount = Math.round((gross - net) * factor) / factor;
+      vatInclusiveNet = net;
       vatRatePercentage = Number(vatRate);
     }
   }
@@ -251,15 +253,19 @@ async function createInvoicePdf(invoiceId: string, documentKind: "invoice" | "re
   document.moveDown();
   document.fontSize(11).text("Description").text("Amount", { align: "right" });
   const menuTipLines = menuCharges?.data ? ["Tip"] : [];
+  const taskGrossAmount = Number(invoice.subtotal) + Number(invoice.tax_amount);
   for (const line of (lines || []).filter((line) => !menuTipLines.includes(line.description))) {
-    document.fontSize(10).text(`${line.description} (${line.quantity} × ${line.unit_price})`).text(`${line.line_total} ${invoice.currency_code}`, { align: "right" });
+    const unitPrice = isWorkerTaskInvoice ? taskGrossAmount : line.unit_price;
+    const lineTotal = isWorkerTaskInvoice ? taskGrossAmount : line.line_total;
+    document.fontSize(10).text(`${line.description} (${line.quantity} × ${unitPrice})`).text(`${lineTotal} ${invoice.currency_code}`, { align: "right" });
   }
   document.moveDown();
   if (!isVatInclusiveSale) {
-    document.text(`Subtotal: ${invoice.subtotal} ${invoice.currency_code}`, { align: "right" });
-    document.text(`VAT: ${invoice.tax_amount} ${invoice.currency_code}`, { align: "right" });
-  } else if (vatAmount === null) {
-    document.text(`Subtotal: ${Number(invoice.subtotal) + Number(invoice.tax_amount)} ${invoice.currency_code}`, { align: "right" });
+    const vatLabel = isWorkerTaskInvoice ? `VAT (${Number(invoice.tax_rate_percentage)}%)` : "VAT";
+    document.text(`Net Amount: ${invoice.subtotal} ${invoice.currency_code}`, { align: "right" });
+    document.text(`${vatLabel}: ${invoice.tax_amount} ${invoice.currency_code}`, { align: "right" });
+  } else if (vatInclusiveNet !== null) {
+    document.text(`Net Amount: ${vatInclusiveNet} ${invoice.currency_code}`, { align: "right" });
   }
   if (menuCharges?.data) {
     if (menuTip > 0) document.text(`Tip: ${menuTip} ${invoice.currency_code}`, { align: "right" });
@@ -320,6 +326,21 @@ async function updateDeliveryAudit(client: ReturnType<typeof supabase>, correlat
 }
 
 const runtimeSecrets = ["SUPABASE_SERVICE_ROLE_KEY", "SUPABASE_WEBHOOK_SECRET", "B2_KEY_ID", "B2_APPLICATION_KEY", "BREVO_API_KEY"];
+
+const signDownloadUrl = (storageKey: string, originalName: string): Promise<string> => {
+  const filename = originalName.split(/[\\/]/).pop()!
+    .replace(/[\r\n";]/g, "_") || "attachment";
+  const fallbackFilename = filename.replace(/[^\x20-\x7E]/g, "_");
+  const encodedFilename = encodeURIComponent(filename).replace(/[!'()*]/g, (character) =>
+    `%${character.charCodeAt(0).toString(16).toUpperCase()}`,
+  );
+  const command = new GetObjectCommand({
+    Bucket: bucket(),
+    Key: storageKey,
+    ResponseContentDisposition: `attachment; filename="${fallbackFilename}"; filename*=UTF-8''${encodedFilename}`,
+  });
+  return getSignedUrl(b2(), command, { expiresIn: 300 });
+};
 
 export const createAttachmentDownloadUrl = onRequest({
   region: "us-central1",
@@ -393,21 +414,60 @@ export const createAttachmentDownloadUrl = onRequest({
       return;
     }
 
-    const filename = (attachment.original_name || attachment.filename).split(/[\\/]/).pop()!
-      .replace(/[\r\n";]/g, "_") || "attachment";
-    const fallbackFilename = filename.replace(/[^\x20-\x7E]/g, "_");
-    const encodedFilename = encodeURIComponent(filename).replace(/[!'()*]/g, (character) =>
-      `%${character.charCodeAt(0).toString(16).toUpperCase()}`,
-    );
-    const command = new GetObjectCommand({
-      Bucket: bucket(),
-      Key: attachment.filename,
-      ResponseContentDisposition: `attachment; filename="${fallbackFilename}"; filename*=UTF-8''${encodedFilename}`,
-    });
-    const url = await getSignedUrl(b2(), command, { expiresIn: 300 });
+    const url = await signDownloadUrl(attachment.filename, attachment.original_name || attachment.filename);
     response.set("Cache-Control", "private, no-store").json({ url });
   } catch {
     response.status(500).json({ error: "Could not prepare attachment download" });
+  }
+});
+
+export const createBooksDocumentDownloadUrl = onRequest({
+  region: "us-central1",
+  cors: true,
+  secrets: ["B2_KEY_ID", "B2_APPLICATION_KEY"],
+}, async (request, response) => {
+  if (request.method !== "POST") {
+    response.status(405).json({ error: "POST required" });
+    return;
+  }
+
+  const authorization = request.header("authorization");
+  const token = authorization?.match(/^Bearer\s+(.+)$/i)?.[1];
+  const anonKey = request.header("apikey");
+  const documentUrl = request.body?.documentUrl;
+  const publicBase = process.env.B2_PUBLIC_URL?.replace(/\/$/, "");
+  if (!token || !anonKey || !publicBase || typeof documentUrl !== "string" || !documentUrl.startsWith(`${publicBase}/`)) {
+    response.status(401).json({ error: "An authenticated Books document is required" });
+    return;
+  }
+
+  try {
+    const userClient = createClient(required("SUPABASE_URL"), anonKey, {
+      auth: { autoRefreshToken: false, persistSession: false },
+      global: { headers: { Authorization: authorization } },
+    });
+    const { data: { user }, error: authError } = await userClient.auth.getUser(token);
+    if (authError || !user) {
+      response.status(401).json({ error: "Your sign-in session has expired" });
+      return;
+    }
+
+    const [invoiceMatches, receiptMatches, expenseReceiptMatches] = await Promise.all([
+      userClient.from("books_invoices").select("id").eq("invoice_url", documentUrl).limit(1),
+      userClient.from("books_invoices").select("id").eq("receipt_url", documentUrl).limit(1),
+      userClient.from("books_expenses").select("id").eq("receipt_url", documentUrl).limit(1),
+    ]);
+    const canDownload = [invoiceMatches, receiptMatches, expenseReceiptMatches].some(({ data }) => data?.length);
+    if (!canDownload) {
+      response.status(403).json({ error: "You cannot access this document" });
+      return;
+    }
+
+    const storageKey = documentUrl.slice(publicBase.length + 1);
+    const url = await signDownloadUrl(storageKey, storageKey);
+    response.set("Cache-Control", "private, no-store").json({ url });
+  } catch {
+    response.status(500).json({ error: "Could not prepare document download" });
   }
 });
 

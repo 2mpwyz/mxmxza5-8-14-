@@ -20,13 +20,16 @@ import {
   DialogFooter,
 } from "./ui/dialog";
 import { CheckCircle, XCircle, MessageCircle, Loader } from "lucide-react";
-import { supabase, TaskProposal } from "../lib/supabase";
+import { supabase, Task, TaskProposal } from "../lib/supabase";
 import { toast } from "../hooks/use-toast";
+import { formatTaskDeadline, toDeadlineInstant } from "../lib/taskDeadline";
+import { formatTaskAmount } from "../lib/taskCurrency";
 
 interface ManagerProposalReviewProps {
   proposal: TaskProposal | null;
   taskTitle: string;
   workerName: string;
+  task?: Task;
   onProposalUpdated?: () => void;
 }
 
@@ -36,6 +39,7 @@ export const ManagerProposalReview: React.FC<ManagerProposalReviewProps> = ({
   proposal,
   taskTitle,
   workerName,
+  task,
   onProposalUpdated,
 }) => {
   const [selectedAction, setSelectedAction] = useState<ReviewAction | null>(null);
@@ -47,6 +51,7 @@ export const ManagerProposalReview: React.FC<ManagerProposalReviewProps> = ({
   const [counterEstimatedTime, setCounterEstimatedTime] = useState("");
   const [counterPaymentTerms, setCounterPaymentTerms] = useState("");
   const [counterNotes, setCounterNotes] = useState("");
+  const [counterDueDate, setCounterDueDate] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   if (!proposal) return null;
@@ -71,6 +76,7 @@ export const ManagerProposalReview: React.FC<ManagerProposalReviewProps> = ({
         if (counterEstimatedTime) updateData.proposed_estimated_time = counterEstimatedTime;
         if (counterPaymentTerms) updateData.proposed_payment_terms = counterPaymentTerms;
         if (counterNotes) updateData.proposal_notes = counterNotes;
+        if (counterDueDate) updateData.proposed_due_date = toDeadlineInstant(counterDueDate);
       }
 
       const { error } = await supabase
@@ -98,6 +104,7 @@ export const ManagerProposalReview: React.FC<ManagerProposalReviewProps> = ({
       setCounterEstimatedTime("");
       setCounterPaymentTerms("");
       setCounterNotes("");
+      setCounterDueDate("");
       setIsDialogOpen(false);
       onProposalUpdated?.();
     } catch (error) {
@@ -154,7 +161,7 @@ export const ManagerProposalReview: React.FC<ManagerProposalReviewProps> = ({
                   Quoted Price
                 </p>
                 <p className="text-2xl font-bold text-green-700">
-                  ${proposal.quoted_price.toFixed(2)}
+                  {formatTaskAmount(proposal.quoted_price, task?.currency_code)}
                 </p>
               </div>
             )}
@@ -166,6 +173,17 @@ export const ManagerProposalReview: React.FC<ManagerProposalReviewProps> = ({
                 </p>
                 <p className="text-lg font-semibold text-sheraton-navy">
                   {proposal.proposed_timeline}
+                </p>
+              </div>
+            )}
+
+            {proposal.proposed_due_date && (
+              <div className="p-4 bg-sheraton-cream rounded-lg border border-sheraton-gold/20">
+                <p className="text-xs font-semibold text-gray-500 uppercase mb-1">
+                  Deadline
+                </p>
+                <p className="text-lg font-semibold text-sheraton-navy">
+                  {formatTaskDeadline(proposal.proposed_due_date)}
                 </p>
               </div>
             )}
@@ -282,7 +300,7 @@ export const ManagerProposalReview: React.FC<ManagerProposalReviewProps> = ({
                     Counter Price (optional)
                   </Label>
                   <div className="flex items-center gap-2 mt-2">
-                    <span className="text-gray-600">$</span>
+                    <span className="text-gray-600">{task?.currency_code}</span>
                     <Input
                       id="counter-price"
                       type="number"
@@ -304,6 +322,19 @@ export const ManagerProposalReview: React.FC<ManagerProposalReviewProps> = ({
                     placeholder="e.g., 5 days, 1 week"
                     value={counterTimeline}
                     onChange={(e) => setCounterTimeline(e.target.value)}
+                    className="mt-2"
+                  />
+                </div>
+
+                <div>
+                  <Label htmlFor="counter-due-date" className="font-semibold">
+                    Counter Deadline (optional)
+                  </Label>
+                  <Input
+                    id="counter-due-date"
+                    type="datetime-local"
+                    value={counterDueDate}
+                    onChange={(e) => setCounterDueDate(e.target.value)}
                     className="mt-2"
                   />
                 </div>

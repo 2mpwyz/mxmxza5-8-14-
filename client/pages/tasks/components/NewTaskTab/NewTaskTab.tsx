@@ -17,6 +17,7 @@ interface FormData {
   dueDate: string;
   estimatedTime: string;
   paymentTerms: string;
+  currency: string;
   budget: string;
   checklist: string[];
   evidenceTypes: string[];
