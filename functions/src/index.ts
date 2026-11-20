@@ -188,6 +188,16 @@ async function createInvoicePdf(invoiceId: string, documentKind: "invoice" | "re
   const { data: invoice, error: invoiceError } = await client.from("books_invoices").select("id,invoice_number,issue_date,due_date,currency_code,subtotal,tax_amount,tax_rate_percentage,other_charges,total_due,organization_id,contact_id,invoice_storage_key,receipt_storage_key,notes,buyer_tax_id").eq("id", invoiceId).single();
   if (invoiceError || !invoice) throw invoiceError || new Error("Invoice not found");
   if (!invoice.contact_id) throw new Error("Invoice has no customer contact");
+  if (invoice.invoice_number.startsWith("TASK-")) {
+    const { data: taskInvoice, error: taskInvoiceError } = await client.from("worker_task_invoices").select("hotel_currency_code,hotel_amount,hotel_tax_amount").eq("invoice_id", invoice.id).maybeSingle();
+    if (taskInvoiceError) throw taskInvoiceError;
+    if (taskInvoice) {
+      invoice.currency_code = taskInvoice.hotel_currency_code;
+      invoice.total_due = Number(taskInvoice.hotel_amount);
+      invoice.tax_amount = Number(taskInvoice.hotel_tax_amount);
+      invoice.subtotal = Number(taskInvoice.hotel_amount) - Number(taskInvoice.hotel_tax_amount);
+    }
+  }
   const { data: loyaltyData, error: loyaltyError } = await client.rpc("get_paid_invoice_loyalty_receipt", { target_invoice_id: invoice.id });
   if (loyaltyError) throw loyaltyError;
   const loyaltySummary = loyaltyData as InvoiceDocument["loyaltySummary"];
