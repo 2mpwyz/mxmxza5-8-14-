@@ -23,7 +23,7 @@ import { supabase, TaskProposal, Task } from "../lib/supabase";
 import { toast } from "../hooks/use-toast";
 import NegotiationChat from "./NegotiationChat";
 import { formatTaskDeadline, toDeadlineInstant } from "../lib/taskDeadline";
-import { formatTaskAmount } from "../lib/taskCurrency";
+import { formatTaskAmount, TASK_CURRENCIES } from "../lib/taskCurrency";
 
 interface WorkerProposalReviewProps {
   proposal: TaskProposal | null;
@@ -57,6 +57,7 @@ export const WorkerProposalReview: React.FC<WorkerProposalReviewProps> = ({
   const [counterPaymentTerms, setCounterPaymentTerms] = useState("");
   const [counterNotes, setCounterNotes] = useState("");
   const [counterDueDate, setCounterDueDate] = useState("");
+  const [counterSettlementCurrency, setCounterSettlementCurrency] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   if (!proposal) return null;
@@ -108,6 +109,7 @@ export const WorkerProposalReview: React.FC<WorkerProposalReviewProps> = ({
             proposed_payment_terms: counterPaymentTerms || proposal.proposed_payment_terms,
             proposal_notes: counterNotes || proposal.proposal_notes,
             proposed_due_date: counterDueDate ? toDeadlineInstant(counterDueDate) : proposal.proposed_due_date,
+            proposed_settlement_currency_code: counterSettlementCurrency || proposal.proposed_settlement_currency_code,
           })
           .eq("id", proposal.id);
 
@@ -128,6 +130,7 @@ export const WorkerProposalReview: React.FC<WorkerProposalReviewProps> = ({
       setCounterPaymentTerms("");
       setCounterNotes("");
       setCounterDueDate("");
+      setCounterSettlementCurrency("");
       setIsDialogOpen(false);
       onProposalUpdated?.();
     } catch (error) {
@@ -217,6 +220,20 @@ export const WorkerProposalReview: React.FC<WorkerProposalReviewProps> = ({
                 </p>
                 <p className="text-lg font-semibold text-sheraton-navy">
                   {formatTaskDeadline(proposal.proposed_due_date)}
+                </p>
+              </div>
+            )}
+
+            {proposal.proposed_settlement_currency_code && proposal.proposed_settlement_currency_code !== task?.currency_code && (
+              <div className="p-4 bg-white rounded-lg border border-sheraton-gold/20">
+                <p className="text-xs font-semibold text-gray-500 uppercase mb-1">
+                  Settlement
+                </p>
+                <p className="text-lg font-semibold text-sheraton-navy">
+                  {proposal.proposed_settlement_currency_code}
+                  {proposal.proposed_settlement_fx_rate
+                    ? ` at 1 ${task?.currency_code} = ${Number(proposal.proposed_settlement_fx_rate).toLocaleString(undefined, { maximumFractionDigits: 8 })}`
+                    : ""}
                 </p>
               </div>
             )}
@@ -458,6 +475,25 @@ export const WorkerProposalReview: React.FC<WorkerProposalReviewProps> = ({
                     onChange={(e) => setCounterPaymentTerms(e.target.value)}
                     className="mt-2"
                   />
+                </div>
+
+                <div>
+                  <Label htmlFor="counter-settlement-currency" className="font-semibold">
+                    Settlement Currency (optional)
+                  </Label>
+                  <select
+                    id="counter-settlement-currency"
+                    value={counterSettlementCurrency}
+                    onChange={(e) => setCounterSettlementCurrency(e.target.value)}
+                    className="w-full mt-2 px-3 py-2 border border-gray-300 rounded-md text-sm bg-white"
+                  >
+                    <option value="">Keep current</option>
+                    {TASK_CURRENCIES.map((currency) => (
+                      <option key={currency.code} value={currency.code}>
+                        {currency.label}
+                      </option>
+                    ))}
+                  </select>
                 </div>
 
                 <div>

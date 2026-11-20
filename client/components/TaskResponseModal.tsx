@@ -16,7 +16,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 import { Loader, CheckCircle, XCircle, MessageSquare } from "lucide-react";
 import { supabase, Task as TaskType } from "../lib/supabase";
 import { formatTaskDeadline } from "../lib/taskDeadline";
-import { formatTaskAmount, getTaskAmount } from "../lib/taskCurrency";
+import { formatTaskAmount, getTaskAmount, TASK_CURRENCIES } from "../lib/taskCurrency";
 import DeadlineCountdown from "./DeadlineCountdown";
 import { toast } from "../hooks/use-toast";
 
@@ -44,6 +44,7 @@ export const TaskResponseModal: React.FC<TaskResponseModalProps> = ({
   const [quotedPrice, setQuotedPrice] = useState("");
   const [proposalNotes, setProposalNotes] = useState("");
   const [proposedTimeline, setProposedTimeline] = useState("");
+  const [proposedSettlementCurrency, setProposedSettlementCurrency] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   if (!task) return null;
@@ -87,6 +88,8 @@ export const TaskResponseModal: React.FC<TaskResponseModalProps> = ({
               quoted_price: quotedPrice ? parseFloat(quotedPrice) : null,
               proposal_notes: proposalNotes,
               proposed_timeline: proposedTimeline,
+              proposed_settlement_currency_code:
+                proposedSettlementCurrency || task.settlement_currency_code || task.currency_code,
             },
           ]);
 
@@ -112,6 +115,7 @@ export const TaskResponseModal: React.FC<TaskResponseModalProps> = ({
       setQuotedPrice("");
       setProposalNotes("");
       setProposedTimeline("");
+      setProposedSettlementCurrency("");
       onClose();
       onResponseSubmitted?.();
     } catch (error) {
@@ -337,6 +341,30 @@ export const TaskResponseModal: React.FC<TaskResponseModalProps> = ({
                   onChange={(e) => setProposedTimeline(e.target.value)}
                   className="mt-2"
                 />
+              </div>
+
+              <div>
+                <Label htmlFor="proposed-settlement-currency" className="font-semibold">
+                  Settlement Currency
+                </Label>
+                <select
+                  id="proposed-settlement-currency"
+                  value={proposedSettlementCurrency}
+                  onChange={(e) => setProposedSettlementCurrency(e.target.value)}
+                  className="w-full mt-2 px-3 py-2 border border-gray-300 rounded-md text-sm bg-white"
+                >
+                  <option value="">
+                    Same as task ({task.settlement_currency_code || task.currency_code})
+                  </option>
+                  {TASK_CURRENCIES.map((currency) => (
+                    <option key={currency.code} value={currency.code}>
+                      {currency.label}
+                    </option>
+                  ))}
+                </select>
+                <p className="text-xs text-gray-600 mt-2">
+                  If different from the task currency, the exchange rate is recorded when the manager accepts.
+                </p>
               </div>
 
               <div>

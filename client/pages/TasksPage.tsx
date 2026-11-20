@@ -72,6 +72,7 @@ const TasksPage: React.FC = () => {
     estimatedTime: "",
     paymentTerms: "",
     currency: "",
+    settlementCurrency: "",
     budget: "",
     checklist: [] as string[],
     evidenceTypes: [] as string[],
@@ -583,6 +584,7 @@ const TasksPage: React.FC = () => {
         is_from_complaint: selectedComplaint !== null,
         budget: formData.budget ? parseFloat(formData.budget) : null,
         currency_code: formData.currency,
+        settlement_currency_code: formData.settlementCurrency || formData.currency,
         created_by: currentUser?.id,
         organization_id: tenant.organizationId,
       };
@@ -691,6 +693,7 @@ const TasksPage: React.FC = () => {
         estimatedTime: "",
         paymentTerms: "",
         currency: "",
+        settlementCurrency: "",
         budget: "",
         checklist: [],
         evidenceTypes: [],

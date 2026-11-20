@@ -18,6 +18,7 @@ interface FormData {
   estimatedTime: string;
   paymentTerms: string;
   currency: string;
+  settlementCurrency: string;
   budget: string;
   checklist: string[];
   evidenceTypes: string[];

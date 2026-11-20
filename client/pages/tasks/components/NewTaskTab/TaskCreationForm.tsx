@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { PlusCircle, Send } from "lucide-react";
 import { Link } from "react-router-dom";
 import {
@@ -35,6 +35,7 @@ interface FormData {
   estimatedTime: string;
   paymentTerms: string;
   currency: string;
+  settlementCurrency: string;
   budget: string;
   checklist: string[];
   evidenceTypes: string[];
@@ -77,6 +78,35 @@ const TaskCreationForm: React.FC<TaskCreationFormProps> = ({
   onRemoveAttachment,
   onCreateTask,
 }) => {
+  const [fxRates, setFxRates] = useState<Record<string, number> | null>(null);
+  const [fxError, setFxError] = useState("");
+  const settlementCurrency = formData.settlementCurrency || formData.currency;
+  const needsConversion =
+    !!formData.currency && !!settlementCurrency && settlementCurrency !== formData.currency;
+
+  useEffect(() => {
+    if (!needsConversion || fxRates) return;
+    let cancelled = false;
+    void (async () => {
+      try {
+        const response = await fetch("/api/books/fx-rates");
+        const payload = (await response.json()) as { rates?: Record<string, number>; error?: string };
+        if (!response.ok || !payload.rates) throw new Error(payload.error || "Exchange rates unavailable");
+        if (!cancelled) setFxRates(payload.rates);
+      } catch (error) {
+        if (!cancelled) setFxError(error instanceof Error ? error.message : "Exchange rates unavailable");
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [needsConversion, fxRates]);
+
+  const indicativeRate =
+    fxRates && fxRates[formData.currency] && fxRates[settlementCurrency]
+      ? fxRates[settlementCurrency] / fxRates[formData.currency]
+      : null;
+
   const handleAddChecklistItem = () => {
     const updatedChecklist = [...(formData.checklist || []), ""];
     onFormChange("checklist", updatedChecklist);
@@ -325,6 +355,35 @@ const TaskCreationForm: React.FC<TaskCreationFormProps> = ({
                   The budget allocated to complete this task, in the selected currency
                 </p>
               </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Settlement Currency</Label>
+              <Select
+                value={settlementCurrency}
+                onValueChange={(value) => onFormChange("settlementCurrency", value)}
+                disabled={!formData.currency}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select task currency first" />
+                </SelectTrigger>
+                <SelectContent>
+                  {TASK_CURRENCIES.map((currency) => (
+                    <SelectItem key={currency.code} value={currency.code}>
+                      {currency.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {needsConversion && (
+                <p className="text-xs text-muted-foreground">
+                  {fxError
+                    ? `Live rate unavailable (${fxError}). The server records the rate when the task is saved.`
+                    : indicativeRate
+                      ? `Indicative rate: 1 ${formData.currency} = ${indicativeRate.toLocaleString(undefined, { maximumFractionDigits: 8 })} ${settlementCurrency}. The saved task records the rate the server resolves.`
+                      : "Loading live rate..."}
+                </p>
+              )}
             </div>
 
             {/* Checklist Section */}
