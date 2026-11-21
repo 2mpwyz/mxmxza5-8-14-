@@ -1,5 +1,6 @@
 const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
 const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+const refreshSecret = Deno.env.get("FX_REFRESH_SECRET")!;
 
 const quoteCurrencies = ["USD", "EUR", "GBP", "KES", "TZS", "RWF"];
 const cacheWindowMs = 10 * 60 * 1000;
@@ -66,7 +67,11 @@ const latestStoredAt = async () => {
   return rows[0] ? new Date(rows[0].stored_at).getTime() : 0;
 };
 
-Deno.serve(async () => {
+Deno.serve(async (request) => {
+  if (!refreshSecret || request.headers.get("x-fx-refresh-secret") !== refreshSecret) {
+    return Response.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
   try {
     const lastStored = await latestStoredAt();
     if (Date.now() - lastStored < cacheWindowMs) {
