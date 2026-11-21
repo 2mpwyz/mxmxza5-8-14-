@@ -153,13 +153,13 @@ const fetchAndStoreRates = async () => {
   const fetchedAt = cached[0]?.fetched_at ? new Date(cached[0].fetched_at).getTime() : 0;
   const cachedRates = Object.fromEntries(cached.map((row) => [row.quote_currency.trim(), Number(row.rate)]));
   const cachedSnapshotIsUsable = cached.length >= supportedCurrencies.size - 1
-    && currentTime - mostRecent < 30 * 60 * 1000
+    && currentTime - mostRecent < 10 * 60 * 1000
     && mostRecent <= currentTime + 5 * 60 * 1000
     && currentTime - fetchedAt <= 36 * 60 * 60 * 1000
     && fetchedAt <= currentTime + 5 * 60 * 1000
     && cached.every((row) => fxProviders.includes(row.provider)
       && new Date(row.fetched_at).getTime() === fetchedAt
-      && currentTime - new Date(row.stored_at).getTime() < 30 * 60 * 1000
+      && currentTime - new Date(row.stored_at).getTime() < 10 * 60 * 1000
       && new Date(row.stored_at).getTime() <= currentTime + 5 * 60 * 1000
       && Number.isFinite(Number(row.rate))
       && Number(row.rate) > 0)
