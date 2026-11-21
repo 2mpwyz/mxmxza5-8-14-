@@ -101,6 +101,7 @@ const BooksPage = () => {
   const [targetCurrency, setTargetCurrency] = useState(requestedCurrency && supportedCurrencies.includes(requestedCurrency) ? requestedCurrency : "USD");
   const [fxRates, setFxRates] = useState<Record<string, number>>({ UGX: 1 });
   const [fxAsOf, setFxAsOf] = useState<string | null>(null);
+  const [fxProvider, setFxProvider] = useState<string | null>(null);
   const [fxError, setFxError] = useState("");
   const [currencyTotals, setCurrencyTotals] = useState<CurrencyTotals[]>([]);
   const [currencyTotalsError, setCurrencyTotalsError] = useState<string | null>(null);
@@ -275,10 +276,11 @@ const BooksPage = () => {
   const refreshExchangeRates = async () => {
     try {
       const response = await fetch("/api/books/fx-rates");
-      const payload = await response.json() as { rates?: Record<string, number>; asOf?: string; error?: string };
+      const payload = await response.json() as { rates?: Record<string, number>; asOf?: string; provider?: string; error?: string };
       if (!response.ok || !payload.rates) throw new Error(payload.error || "Exchange rates could not be refreshed");
       setFxRates(payload.rates);
       setFxAsOf(payload.asOf || null);
+      setFxProvider(payload.provider || null);
       setFxError("");
     } catch (error) {
       setFxError(error instanceof Error ? error.message : "Exchange rates could not be refreshed");
@@ -568,7 +570,7 @@ const BooksPage = () => {
         <div className="mb-8 flex flex-col justify-between gap-4 md:flex-row md:items-end">
           <div><div className="mb-3 flex items-center gap-2"><BookOpen className="h-7 w-7 text-sheraton-gold" /><Badge className="bg-sheraton-gold text-sheraton-navy">Books</Badge></div><h1 className="text-4xl font-bold text-sheraton-navy">{isPersonalWorkspace ? "Personal Books" : isConsolidatedView ? "Consolidated financials" : isUsdView ? "USD Books" : "Your business finances"}</h1>{!isPersonalWorkspace && organizationName && <p className="mt-1 text-lg font-semibold text-sheraton-navy">{organizationName}</p>}<p className="mt-2 max-w-2xl text-muted-foreground">{isPersonalWorkspace ? "Purchases from signed-in hotel checkouts are recorded here separately from your hotel or business books." : "One secure Books workspace, with same-currency accounting views and transparent conversions using stored reference exchange rates."}</p></div>
           <div className="flex gap-2"><Button variant="outline" disabled={isWorkerAccount === true} onClick={() => { const nextParams = new URLSearchParams(searchParams); if (isPersonalWorkspace) { nextParams.delete("workspace"); nextParams.delete("organization"); } else { nextParams.set("workspace", "personal"); nextParams.delete("organization"); } navigate(`/books?${nextParams.toString()}`); }}>{isPersonalWorkspace ? "Business Books" : "Personal Books"}</Button><Button variant="outline" onClick={() => void loadBooks()}><RefreshCw className="mr-2 h-4 w-4" />Refresh</Button></div>
-          {isConsolidatedView && <Card className="w-full"><CardContent className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between"><div><p className="font-semibold">Convert consolidated totals</p><p className="text-xs text-muted-foreground">Reference rate · open.er-api.com · {fxAsOf ? `source timestamp ${new Date(fxAsOf).toLocaleString()}` : "rates loading"}</p></div><div className="flex gap-2"><select aria-label="Converted reporting currency" className="h-10 rounded-md border border-input bg-background px-3 text-sm" value={targetCurrency} onChange={(event) => setTargetCurrency(event.target.value)}>{supportedCurrencies.map((code) => <option key={code} value={code}>{code}</option>)}</select><Button type="button" variant="outline" onClick={() => void refreshExchangeRates()}><RefreshCw className="mr-2 h-4 w-4" />Refresh rates</Button></div>{fxError && <p role="alert" className="text-sm text-destructive">{fxError}</p>}</CardContent></Card>}
+          {isConsolidatedView && <Card className="w-full"><CardContent className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between"><div><p className="font-semibold">Convert consolidated totals</p><p className="text-xs text-muted-foreground">Reference rate · {fxProvider ?? "loading"} · {fxAsOf ? `source timestamp ${new Date(fxAsOf).toLocaleString()}` : "rates loading"}</p></div><div className="flex gap-2"><select aria-label="Converted reporting currency" className="h-10 rounded-md border border-input bg-background px-3 text-sm" value={targetCurrency} onChange={(event) => setTargetCurrency(event.target.value)}>{supportedCurrencies.map((code) => <option key={code} value={code}>{code}</option>)}</select><Button type="button" variant="outline" onClick={() => void refreshExchangeRates()}><RefreshCw className="mr-2 h-4 w-4" />Refresh rates</Button></div>{fxError && <p role="alert" className="text-sm text-destructive">{fxError}</p>}</CardContent></Card>}
         </div>
         {currencyTotalsError && <div role="alert" className="mb-4 flex flex-col gap-3 rounded-lg border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive sm:flex-row sm:items-center sm:justify-between"><p>{currencyTotalsError}</p><Button variant="outline" size="sm" onClick={() => void loadBooks()}>Retry totals</Button></div>}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
