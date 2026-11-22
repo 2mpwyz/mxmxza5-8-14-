@@ -42,11 +42,8 @@ type WorkerTaskPayment = { id: string; task_id: string; confirmation_status: "pe
 type FxConversion = { id: string; conversion_date: string; exchange_at: string | null; from_currency_code: string; from_amount: number; to_ugx_amount: number; carrying_ugx_per_unit: number; realized_fx_difference: number; provider: string | null; reference: string | null };
 
 const today = new Date().toISOString().slice(0, 10);
-const nowLocalDateTime = () => {
-  const now = new Date();
-  now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
-  return now.toISOString().slice(0, 16);
-};
+const UGANDA_UTC_OFFSET = "+03:00";
+const nowLocalDateTime = () => new Date(Date.now() + 3 * 60 * 60 * 1000).toISOString().slice(0, 16);
 const formatMoney = (value: number, currency: string) => new Intl.NumberFormat(undefined, { style: "currency", currency: currency.trim(), maximumFractionDigits: currency.trim() === "UGX" ? 0 : 2 }).format(value || 0);
 const supportedCurrencies = ["UGX", "USD", "EUR", "GBP", "KES", "TZS", "RWF"];
 
@@ -461,7 +458,7 @@ const BooksPage = () => {
       const { error } = await supabase.rpc("record_books_fx_conversion", {
         p_organization_id: organizationId,
         p_conversion_date: fxConversionForm.exchange_at.slice(0, 10),
-        p_exchange_at: new Date(fxConversionForm.exchange_at).toISOString(),
+        p_exchange_at: new Date(`${fxConversionForm.exchange_at}:00${UGANDA_UTC_OFFSET}`).toISOString(),
         p_from_currency_code: fxConversionForm.from_currency_code,
         p_from_amount: Number(fxConversionForm.from_amount),
         p_to_ugx_amount: Number(fxConversionForm.to_ugx_amount),
