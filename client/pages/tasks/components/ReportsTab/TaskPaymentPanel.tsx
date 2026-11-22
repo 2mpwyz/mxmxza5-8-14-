@@ -159,7 +159,7 @@ const TaskPaymentPanel: React.FC<TaskPaymentPanelProps> = ({ task }) => {
           {paysInUgx && fundingConversions.length > 0 ? (
             <div>
               <label htmlFor="worker-payment-fx-conversion" className="block text-sm font-medium text-gray-700 mb-1">
-                Exchange used to pay (optional)
+                Other Exchange Rate (optional)
               </label>
               <select
                 id="worker-payment-fx-conversion"
@@ -167,7 +167,7 @@ const TaskPaymentPanel: React.FC<TaskPaymentPanelProps> = ({ task }) => {
                 onChange={(event) => setSelectedConversionId(event.target.value)}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg"
               >
-                <option value="">Not linked</option>
+                <option value="">No exchange recorded</option>
                 {fundingConversions.map((conversion) => (
                   <option key={conversion.id} value={conversion.id}>
                     {formatConversionLabel(conversion)}
