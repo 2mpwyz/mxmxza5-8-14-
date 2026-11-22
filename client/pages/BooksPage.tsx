@@ -149,6 +149,27 @@ const BooksPage = () => {
   const [invoiceForm, setInvoiceForm] = useState({ invoice_number: "", contact_id: "", issue_date: today, due_date: today, subtotal: "", tax_rate_id: "" });
   const [expenseForm, setExpenseForm] = useState({ description: "", contact_id: "", expense_date: today, amount: "", tax_amount: "", tax_treatment: "review" as TaxTreatment, vat_recoverable: true });
   const [fxConversionForm, setFxConversionForm] = useState({ exchange_at: nowLocalDateTime(), from_currency_code: "USD", from_amount: "", to_ugx_amount: "", carrying_ugx_per_unit: "", provider: "", reference: "" });
+  const updateFxField = (field: "from_amount" | "to_ugx_amount" | "carrying_ugx_per_unit", value: string) => {
+    setFxConversionForm((current) => {
+      const next = { ...current, [field]: value };
+      const given = Number(next.from_amount);
+      const received = Number(next.to_ugx_amount);
+      const rate = Number(next.carrying_ugx_per_unit);
+      const canDeriveRate = given > 0 && received > 0;
+      if (field === "from_amount") {
+        if (canDeriveRate) next.carrying_ugx_per_unit = String(Number((received / given).toFixed(6)));
+        else if (given > 0 && rate > 0) next.to_ugx_amount = String(Number((given * rate).toFixed(2)));
+      } else if (field === "to_ugx_amount") {
+        if (canDeriveRate) next.carrying_ugx_per_unit = String(Number((received / given).toFixed(6)));
+        else if (received > 0 && rate > 0) next.from_amount = String(Number((received / rate).toFixed(2)));
+      } else if (given > 0 && rate > 0) {
+        next.to_ugx_amount = String(Number((given * rate).toFixed(2)));
+      } else if (received > 0 && rate > 0) {
+        next.from_amount = String(Number((received / rate).toFixed(2)));
+      }
+      return next;
+    });
+  };
   const [taxPeriodStart, setTaxPeriodStart] = useState(`${new Date().getFullYear()}-01-01`);
   const [taxPeriodEnd, setTaxPeriodEnd] = useState(`${new Date().getFullYear()}-12-31`);
 
@@ -613,13 +634,13 @@ const BooksPage = () => {
   const currencyExchangeCard = !isPersonalWorkspace && isWorkerAccount !== true ? (
     <>
       <EntryCard title="Record currency exchange" onSubmit={saveFxConversion} saving={saving}>
-        <p className="text-sm text-muted-foreground">Record a real exchange, such as USD sold at a bank or forex bureau for UGX. Enter the UGX value of the foreign currency you gave up from your own records, so any gain or loss is measured correctly.</p>
+        <p className="text-sm text-muted-foreground">Record a real exchange, such as USD sold at a bank or forex bureau for UGX. Fill in any two of the three amounts and the third is worked out for you. The carrying rate is the rate you recorded when you got the foreign currency.</p>
         <div className="grid gap-4 md:grid-cols-4">
           <Field label="Exchange date and time"><Input type="datetime-local" value={fxConversionForm.exchange_at} onChange={(event) => setFxConversionForm({ ...fxConversionForm, exchange_at: event.target.value })} required /></Field>
           <Field label="Currency given up"><select className="flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm" value={fxConversionForm.from_currency_code} onChange={(event) => setFxConversionForm({ ...fxConversionForm, from_currency_code: event.target.value })}>{supportedCurrencies.filter((code) => code !== "UGX").map((code) => <option key={code} value={code}>{code}</option>)}</select></Field>
-          <Field label={`Amount given up (${fxConversionForm.from_currency_code})`}><Input type="number" min="0" step="0.01" value={fxConversionForm.from_amount} onChange={(event) => setFxConversionForm({ ...fxConversionForm, from_amount: event.target.value })} required /></Field>
-          <Field label="UGX received"><Input type="number" min="0" step="0.01" value={fxConversionForm.to_ugx_amount} onChange={(event) => setFxConversionForm({ ...fxConversionForm, to_ugx_amount: event.target.value })} required /></Field>
-          <Field label={`Carrying rate (UGX per 1 ${fxConversionForm.from_currency_code})`}><Input type="number" min="0" step="0.00000001" value={fxConversionForm.carrying_ugx_per_unit} onChange={(event) => setFxConversionForm({ ...fxConversionForm, carrying_ugx_per_unit: event.target.value })} required /></Field>
+          <Field label={`Amount given up (${fxConversionForm.from_currency_code})`}><Input type="number" min="0" step="0.01" value={fxConversionForm.from_amount} onChange={(event) => updateFxField("from_amount", event.target.value)} required /></Field>
+          <Field label="UGX received"><Input type="number" min="0" step="0.01" value={fxConversionForm.to_ugx_amount} onChange={(event) => updateFxField("to_ugx_amount", event.target.value)} required /></Field>
+          <Field label={`Carrying rate (UGX per 1 ${fxConversionForm.from_currency_code})`}><Input type="number" min="0" step="0.00000001" value={fxConversionForm.carrying_ugx_per_unit} onChange={(event) => updateFxField("carrying_ugx_per_unit", event.target.value)} required /></Field>
           <Field label="Provider (optional)"><Input value={fxConversionForm.provider} onChange={(event) => setFxConversionForm({ ...fxConversionForm, provider: event.target.value })} placeholder="Bank or forex bureau" /></Field>
           <Field label="Reference (optional)"><Input value={fxConversionForm.reference} onChange={(event) => setFxConversionForm({ ...fxConversionForm, reference: event.target.value })} placeholder="Receipt number" /></Field>
         </div>
