@@ -8,7 +8,7 @@ type FundingConversion = { id: string; conversion_date: string; exchange_at: str
 
 const formatConversionLabel = (conversion: FundingConversion) => {
   const when = conversion.exchange_at
-    ? `${new Date(conversion.exchange_at).toLocaleString("en-GB", { timeZone: "Africa/Kampala", dateStyle: "medium", timeStyle: "short" })} EAT`
+    ? new Date(conversion.exchange_at).toLocaleString("en-GB", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit", timeZoneName: "short" })
     : conversion.conversion_date;
   const rate = Number(conversion.to_ugx_amount) / Number(conversion.from_amount);
   return `${conversion.provider || "Exchange"} · ${when} · ${rate.toLocaleString(undefined, { maximumFractionDigits: 2 })} UGX per 1 ${conversion.from_currency_code}`;
@@ -153,13 +153,13 @@ const TaskPaymentPanel: React.FC<TaskPaymentPanelProps> = ({ task }) => {
           </div>
           {task.settlement_currency_code && task.settlement_currency_code !== task.currency_code && task.settlement_fx_rate ? (
             <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg text-sm text-blue-900">
-              Settles in {task.settlement_currency_code} at the agreed rate: 1 {task.currency_code} = {Number(task.settlement_fx_rate).toLocaleString(undefined, { maximumFractionDigits: 8 })} {task.settlement_currency_code}
+              Paid in {task.settlement_currency_code} at the agreed rate: 1 {task.currency_code} = {Number(task.settlement_fx_rate).toLocaleString(undefined, { maximumFractionDigits: 8 })} {task.settlement_currency_code}
             </div>
           ) : null}
           {paysInUgx && fundingConversions.length > 0 ? (
             <div>
               <label htmlFor="worker-payment-fx-conversion" className="block text-sm font-medium text-gray-700 mb-1">
-                Funded by currency exchange (optional)
+                Exchange used to pay (optional)
               </label>
               <select
                 id="worker-payment-fx-conversion"
