@@ -1,6 +1,14 @@
 alter table public.books_fx_conversions
   add column if not exists carrying_rate_recorded boolean not null default true;
 
+alter table public.books_fx_conversions disable trigger books_fx_conversions_immutable;
+
+update public.books_fx_conversions
+   set carrying_rate_recorded = false
+ where abs(carrying_ugx_per_unit - to_ugx_amount / from_amount) <= 0.00000001;
+
+alter table public.books_fx_conversions enable trigger books_fx_conversions_immutable;
+
 drop function if exists public.record_books_fx_conversion(uuid, date, text, numeric, numeric, numeric, text, text, timestamptz);
 
 create or replace function public.record_books_fx_conversion(
