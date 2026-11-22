@@ -4,7 +4,15 @@ import { toast } from "../../../../hooks/use-toast";
 import { formatTaskAmount } from "../../../../lib/taskCurrency";
 import { useHotelTenant } from "../../../../lib/hotelTenant";
 
-type FundingConversion = { id: string; conversion_date: string; from_currency_code: string; from_amount: number; to_ugx_amount: number };
+type FundingConversion = { id: string; conversion_date: string; exchange_at: string | null; provider: string | null; from_currency_code: string; from_amount: number; to_ugx_amount: number };
+
+const formatConversionLabel = (conversion: FundingConversion) => {
+  const when = conversion.exchange_at
+    ? `${new Date(conversion.exchange_at).toLocaleString("en-GB", { timeZone: "Africa/Kampala", dateStyle: "medium", timeStyle: "short" })} EAT`
+    : conversion.conversion_date;
+  const rate = Number(conversion.to_ugx_amount) / Number(conversion.from_amount);
+  return `${conversion.provider || "Exchange"} · ${when} · ${rate.toLocaleString(undefined, { maximumFractionDigits: 2 })} UGX per 1 ${conversion.from_currency_code}`;
+};
 
 const PAYMENT_METHODS: Array<{ value: WorkerTaskPayment["payment_method"]; label: string }> = [
   { value: "bank_transfer", label: "Bank transfer" },
@@ -82,7 +90,7 @@ const TaskPaymentPanel: React.FC<TaskPaymentPanelProps> = ({ task }) => {
     void (async () => {
       const { data, error } = await supabase
         .from("books_fx_conversions")
-        .select("id, conversion_date, from_currency_code, from_amount, to_ugx_amount")
+        .select("id, conversion_date, exchange_at, provider, from_currency_code, from_amount, to_ugx_amount")
         .eq("organization_id", organizationId)
         .eq("from_currency_code", task.currency_code)
         .order("conversion_date", { ascending: false });
@@ -162,7 +170,7 @@ const TaskPaymentPanel: React.FC<TaskPaymentPanelProps> = ({ task }) => {
                 <option value="">Not linked</option>
                 {fundingConversions.map((conversion) => (
                   <option key={conversion.id} value={conversion.id}>
-                    {conversion.conversion_date}: {Number(conversion.from_amount).toLocaleString()} {conversion.from_currency_code} to {Number(conversion.to_ugx_amount).toLocaleString()} UGX
+                    {formatConversionLabel(conversion)}
                   </option>
                 ))}
               </select>

@@ -39,9 +39,14 @@ type LoyaltyPosting = { ledger_entry_id: string; amount_ugx: number; status: "pe
 
 type WorkerTaskPayment = { id: string; task_id: string; confirmation_status: "pending_confirmation" | "confirmed" | "legacy_settled"; worker_acknowledged_at: string | null; amount: number; currency_code: string; converted_amount: number | null; worker_currency_code: string | null; fx_rate: number | null; fx_rate_source: "same_currency" | "stored" | "manual" | null; payment_method: string; payment_reference: string; paid_at: string };
 
-type FxConversion = { id: string; conversion_date: string; from_currency_code: string; from_amount: number; to_ugx_amount: number; carrying_ugx_per_unit: number; realized_fx_difference: number; provider: string | null; reference: string | null };
+type FxConversion = { id: string; conversion_date: string; exchange_at: string | null; from_currency_code: string; from_amount: number; to_ugx_amount: number; carrying_ugx_per_unit: number; realized_fx_difference: number; provider: string | null; reference: string | null };
 
 const today = new Date().toISOString().slice(0, 10);
+const nowLocalDateTime = () => {
+  const now = new Date();
+  now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
+  return now.toISOString().slice(0, 16);
+};
 const formatMoney = (value: number, currency: string) => new Intl.NumberFormat(undefined, { style: "currency", currency: currency.trim(), maximumFractionDigits: currency.trim() === "UGX" ? 0 : 2 }).format(value || 0);
 const supportedCurrencies = ["UGX", "USD", "EUR", "GBP", "KES", "TZS", "RWF"];
 
@@ -146,7 +151,7 @@ const BooksPage = () => {
   const [contactForm, setContactForm] = useState({ name: "", type: "customer" as Contact["type"], email: "", tax_id: "" });
   const [invoiceForm, setInvoiceForm] = useState({ invoice_number: "", contact_id: "", issue_date: today, due_date: today, subtotal: "", tax_rate_id: "" });
   const [expenseForm, setExpenseForm] = useState({ description: "", contact_id: "", expense_date: today, amount: "", tax_amount: "", tax_treatment: "review" as TaxTreatment, vat_recoverable: true });
-  const [fxConversionForm, setFxConversionForm] = useState({ conversion_date: today, from_currency_code: "USD", from_amount: "", to_ugx_amount: "", carrying_ugx_per_unit: "", provider: "", reference: "" });
+  const [fxConversionForm, setFxConversionForm] = useState({ exchange_at: nowLocalDateTime(), from_currency_code: "USD", from_amount: "", to_ugx_amount: "", carrying_ugx_per_unit: "", provider: "", reference: "" });
   const [taxPeriodStart, setTaxPeriodStart] = useState(`${new Date().getFullYear()}-01-01`);
   const [taxPeriodEnd, setTaxPeriodEnd] = useState(`${new Date().getFullYear()}-12-31`);
 
@@ -245,7 +250,7 @@ const BooksPage = () => {
       const { data: paymentRows, error: paymentError } = await supabase.from("worker_task_payments").select("id,task_id,confirmation_status,worker_acknowledged_at,amount,currency_code,converted_amount,worker_currency_code,fx_rate,fx_rate_source,payment_method,payment_reference,paid_at").order("paid_at", { ascending: false });
       if (paymentError) reportBooksError(operation, correlationId, orgId, null, paymentError);
       setWorkerTaskPayments(paymentError ? [] : (paymentRows || []) as WorkerTaskPayment[]);
-      const { data: conversionRows, error: conversionError } = await supabase.from("books_fx_conversions").select("id,conversion_date,from_currency_code,from_amount,to_ugx_amount,carrying_ugx_per_unit,realized_fx_difference,provider,reference").eq("organization_id", orgId).order("conversion_date", { ascending: false });
+      const { data: conversionRows, error: conversionError } = await supabase.from("books_fx_conversions").select("id,conversion_date,exchange_at,from_currency_code,from_amount,to_ugx_amount,carrying_ugx_per_unit,realized_fx_difference,provider,reference").eq("organization_id", orgId).order("conversion_date", { ascending: false });
       if (conversionError) reportBooksError(operation, correlationId, orgId, null, conversionError);
       setFxConversions(conversionError ? [] : (conversionRows || []) as FxConversion[]);
       if (isConsolidatedView) {
@@ -455,7 +460,8 @@ const BooksPage = () => {
     try {
       const { error } = await supabase.rpc("record_books_fx_conversion", {
         p_organization_id: organizationId,
-        p_conversion_date: fxConversionForm.conversion_date,
+        p_conversion_date: fxConversionForm.exchange_at.slice(0, 10),
+        p_exchange_at: new Date(fxConversionForm.exchange_at).toISOString(),
         p_from_currency_code: fxConversionForm.from_currency_code,
         p_from_amount: Number(fxConversionForm.from_amount),
         p_to_ugx_amount: Number(fxConversionForm.to_ugx_amount),
@@ -468,7 +474,7 @@ const BooksPage = () => {
         toast({ title: "Currency exchange not recorded", description: error.message, variant: "destructive" });
         return;
       }
-      setFxConversionForm({ conversion_date: today, from_currency_code: "USD", from_amount: "", to_ugx_amount: "", carrying_ugx_per_unit: "", provider: "", reference: "" });
+      setFxConversionForm({ exchange_at: nowLocalDateTime(), from_currency_code: "USD", from_amount: "", to_ugx_amount: "", carrying_ugx_per_unit: "", provider: "", reference: "" });
       toast({ title: "Currency exchange recorded", description: "The foreign currency was moved to UGX, and any gain or loss was posted." });
       await loadBooks();
     } catch (error) {
@@ -612,7 +618,7 @@ const BooksPage = () => {
       <EntryCard title="Record currency exchange" onSubmit={saveFxConversion} saving={saving}>
         <p className="text-sm text-muted-foreground">Record a real exchange, such as USD sold at a bank or forex bureau for UGX. Enter the UGX value of the foreign currency you gave up from your own records, so any gain or loss is measured correctly.</p>
         <div className="grid gap-4 md:grid-cols-4">
-          <Field label="Date"><Input type="date" value={fxConversionForm.conversion_date} onChange={(event) => setFxConversionForm({ ...fxConversionForm, conversion_date: event.target.value })} required /></Field>
+          <Field label="Exchange date and time"><Input type="datetime-local" value={fxConversionForm.exchange_at} onChange={(event) => setFxConversionForm({ ...fxConversionForm, exchange_at: event.target.value })} required /></Field>
           <Field label="Currency given up"><select className="flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm" value={fxConversionForm.from_currency_code} onChange={(event) => setFxConversionForm({ ...fxConversionForm, from_currency_code: event.target.value })}>{supportedCurrencies.filter((code) => code !== "UGX").map((code) => <option key={code} value={code}>{code}</option>)}</select></Field>
           <Field label={`Amount given up (${fxConversionForm.from_currency_code})`}><Input type="number" min="0" step="0.01" value={fxConversionForm.from_amount} onChange={(event) => setFxConversionForm({ ...fxConversionForm, from_amount: event.target.value })} required /></Field>
           <Field label="UGX received"><Input type="number" min="0" step="0.01" value={fxConversionForm.to_ugx_amount} onChange={(event) => setFxConversionForm({ ...fxConversionForm, to_ugx_amount: event.target.value })} required /></Field>
@@ -622,7 +628,7 @@ const BooksPage = () => {
         </div>
         {fxPreviewDifference !== null && <p className="text-sm">Implied exchange rate: 1 {fxConversionForm.from_currency_code} = {fxImpliedRate!.toLocaleString(undefined, { maximumFractionDigits: 2 })} UGX. {fxPreviewDifference === 0 ? "No realized gain or loss." : `Realized ${fxPreviewDifference > 0 ? "gain" : "loss"}: ${formatMoney(Math.abs(fxPreviewDifference), "UGX")}.`}</p>}
       </EntryCard>
-      {fxConversions.length > 0 && <DataTable headers={["Date", "Given up", "UGX received", "Carrying rate", "Gain / (loss)", "Provider", "Reference"]}>{fxConversions.map((conversion) => <tr key={conversion.id} className="border-b"><td className="p-4">{new Date(conversion.conversion_date).toLocaleDateString()}</td><td className="p-4">{formatMoney(Number(conversion.from_amount), conversion.from_currency_code)}</td><td className="p-4">{formatMoney(Number(conversion.to_ugx_amount), "UGX")}</td><td className="p-4 text-sm">{Number(conversion.carrying_ugx_per_unit).toLocaleString(undefined, { maximumFractionDigits: 8 })} UGX</td><td className="p-4">{formatMoney(Number(conversion.realized_fx_difference), "UGX")}</td><td className="p-4">{conversion.provider || "—"}</td><td className="p-4 font-mono text-xs">{conversion.reference || "—"}</td></tr>)}</DataTable>}
+      {fxConversions.length > 0 && <DataTable headers={["Date", "Given up", "UGX received", "Carrying rate", "Gain / (loss)", "Provider", "Reference"]}>{fxConversions.map((conversion) => <tr key={conversion.id} className="border-b"><td className="p-4">{conversion.exchange_at ? new Date(conversion.exchange_at).toLocaleString("en-GB", { timeZone: "Africa/Kampala", dateStyle: "medium", timeStyle: "short" }) + " EAT" : new Date(conversion.conversion_date).toLocaleDateString()}</td><td className="p-4">{formatMoney(Number(conversion.from_amount), conversion.from_currency_code)}</td><td className="p-4">{formatMoney(Number(conversion.to_ugx_amount), "UGX")}</td><td className="p-4 text-sm">{Number(conversion.carrying_ugx_per_unit).toLocaleString(undefined, { maximumFractionDigits: 8 })} UGX</td><td className="p-4">{formatMoney(Number(conversion.realized_fx_difference), "UGX")}</td><td className="p-4">{conversion.provider || "—"}</td><td className="p-4 font-mono text-xs">{conversion.reference || "—"}</td></tr>)}</DataTable>}
     </>
   ) : null;
 
