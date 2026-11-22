@@ -167,7 +167,7 @@ const TaskPaymentPanel: React.FC<TaskPaymentPanelProps> = ({ task }) => {
                 onChange={(event) => setSelectedConversionId(event.target.value)}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg"
               >
-                <option value="">No exchange recorded</option>
+                <option value="">None</option>
                 {fundingConversions.map((conversion) => (
                   <option key={conversion.id} value={conversion.id}>
                     {formatConversionLabel(conversion)}
