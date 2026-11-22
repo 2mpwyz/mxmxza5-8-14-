@@ -42,8 +42,7 @@ type WorkerTaskPayment = { id: string; task_id: string; confirmation_status: "pe
 type FxConversion = { id: string; conversion_date: string; exchange_at: string | null; from_currency_code: string; from_amount: number; to_ugx_amount: number; carrying_ugx_per_unit: number; realized_fx_difference: number; provider: string | null; reference: string | null };
 
 const today = new Date().toISOString().slice(0, 10);
-const DEFAULT_BOOKS_TIMEZONE = "Africa/Kampala";
-const TIMEZONE_LABELS: Record<string, string> = { "Africa/Kampala": "EAT" };
+const browserTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
 const zoneParts = (instant: Date, timezone: string) =>
   Object.fromEntries(new Intl.DateTimeFormat("en-CA", { timeZone: timezone, year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).formatToParts(instant).map(({ type, value }) => [type, value]));
 const localDateTimeInZone = (instant: Date, timezone: string) => {
@@ -56,14 +55,14 @@ const instantFromLocalDateTime = (local: string, timezone: string) => {
   const shownAsUtc = Date.UTC(Number(parts.year), Number(parts.month) - 1, Number(parts.day), Number(parts.hour), Number(parts.minute));
   return new Date(wallClock.getTime() - (shownAsUtc - wallClock.getTime()));
 };
-const formatInTimezone = (instant: string, timezone: string) => `${new Date(instant).toLocaleString("en-GB", { timeZone: timezone, dateStyle: "medium", timeStyle: "short" })} ${TIMEZONE_LABELS[timezone] ?? timezone}`;
+const formatExchangeTime = (instant: string) => new Date(instant).toLocaleString("en-GB", { timeZone: browserTimezone, day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit", timeZoneName: "short" });
 const formatMoney = (value: number, currency: string) => new Intl.NumberFormat(undefined, { style: "currency", currency: currency.trim(), maximumFractionDigits: currency.trim() === "UGX" ? 0 : 2 }).format(value || 0);
 const supportedCurrencies = ["UGX", "USD", "EUR", "GBP", "KES", "TZS", "RWF"];
 
 type CurrencyTotals = { currency_code: string; invoice_total: number; income: number; expenses: number; net_result: number; tax_total: number; receivables: number; assets: number; liabilities: number; equity: number };
 
 type SupabaseErrorLike = { code?: string | null; message?: string | null; details?: string | null; hint?: string | null };
-type BooksOperation = "books.load" | "books.contact.save" | "books.invoice.save" | "books.expense.save" | "books.expense.taxTreatment.save" | "books.tax.profile.save" | "books.tax.vat.save" | "books.tax.income.save" | "books.vatRegistration.save" | "books.fx.conversion.save" | "books.timezone.save";
+type BooksOperation = "books.load" | "books.contact.save" | "books.invoice.save" | "books.expense.save" | "books.expense.taxTreatment.save" | "books.tax.profile.save" | "books.tax.vat.save" | "books.tax.income.save" | "books.vatRegistration.save" | "books.fx.conversion.save";
 
 const newCorrelationId = () => {
   if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") return crypto.randomUUID();
@@ -161,8 +160,6 @@ const BooksPage = () => {
   const [contactForm, setContactForm] = useState({ name: "", type: "customer" as Contact["type"], email: "", tax_id: "" });
   const [invoiceForm, setInvoiceForm] = useState({ invoice_number: "", contact_id: "", issue_date: today, due_date: today, subtotal: "", tax_rate_id: "" });
   const [expenseForm, setExpenseForm] = useState({ description: "", contact_id: "", expense_date: today, amount: "", tax_amount: "", tax_treatment: "review" as TaxTreatment, vat_recoverable: true });
-  const [organizationTimezone, setOrganizationTimezone] = useState(DEFAULT_BOOKS_TIMEZONE);
-  const [timezoneForm, setTimezoneForm] = useState(DEFAULT_BOOKS_TIMEZONE);
   const [fxConversionForm, setFxConversionForm] = useState({ exchange_at: "", from_currency_code: "USD", from_amount: "", to_ugx_amount: "", carrying_ugx_per_unit: "", provider: "", reference: "" });
   const updateFxField = (field: "from_amount" | "to_ugx_amount" | "carrying_ugx_per_unit", value: string) => {
     setFxConversionForm((current) => {
@@ -243,7 +240,7 @@ const BooksPage = () => {
       }
       setOrganizationId(orgId);
       const [org, contactResult, invoiceResult, expenseResult, accountResult, taxResult, incomeTaxResult, transactionResult, loyaltyPostingResult] = await Promise.all([
-        supabase.from("books_organizations").select("name,base_currency,tax_country_code,tax_entity_type,vat_registered,timezone").eq("id", orgId).single(),
+        supabase.from("books_organizations").select("name,base_currency,tax_country_code,tax_entity_type,vat_registered").eq("id", orgId).single(),
         supabase.from("books_contacts").select("id,name,type,email,tax_id").eq("organization_id", orgId).order("name"),
         supabase.from("books_invoices").select("id,invoice_number,contact_id,issue_date,due_date,currency_code,subtotal,tax_amount,total_due,status,invoice_url,receipt_url").eq("organization_id", orgId).order("issue_date", { ascending: false }),
         supabase.from("books_expenses").select("id,description,contact_id,expense_date,currency_code,amount,tax_amount,payment_status,purchase_source_type,tax_treatment,vat_recoverable,receipt_url").eq("organization_id", orgId).order("expense_date", { ascending: false }),
@@ -263,10 +260,7 @@ const BooksPage = () => {
       setOrganizationName(org.data?.name || "");
       if (org.data?.base_currency) setBaseCurrency(org.data.base_currency.trim());
       setVatRegistered(org.data?.vat_registered === true);
-      const nextTimezone = org.data?.timezone || DEFAULT_BOOKS_TIMEZONE;
-      setOrganizationTimezone(nextTimezone);
-      setTimezoneForm(nextTimezone);
-      setFxConversionForm((current) => ({ ...current, exchange_at: current.exchange_at || localDateTimeInZone(new Date(), nextTimezone) }));
+      setFxConversionForm((current) => ({ ...current, exchange_at: current.exchange_at || localDateTimeInZone(new Date(), browserTimezone) }));
       const nextTaxProfile = { country_code: org.data?.tax_country_code?.trim() || "UG", tax_entity_type: org.data?.tax_entity_type || null } as OrganizationTaxProfile;
       setOrganizationTaxProfile(nextTaxProfile);
       setTaxProfileForm(nextTaxProfile);
@@ -498,7 +492,7 @@ const BooksPage = () => {
       const { error } = await supabase.rpc("record_books_fx_conversion", {
         p_organization_id: organizationId,
         p_conversion_date: fxConversionForm.exchange_at.slice(0, 10),
-        p_exchange_at: instantFromLocalDateTime(fxConversionForm.exchange_at, organizationTimezone).toISOString(),
+        p_exchange_at: instantFromLocalDateTime(fxConversionForm.exchange_at, browserTimezone).toISOString(),
         p_from_currency_code: fxConversionForm.from_currency_code,
         p_from_amount: Number(fxConversionForm.from_amount),
         p_to_ugx_amount: Number(fxConversionForm.to_ugx_amount),
@@ -511,7 +505,7 @@ const BooksPage = () => {
         toast({ title: "Currency exchange not recorded", description: error.message, variant: "destructive" });
         return;
       }
-      setFxConversionForm({ exchange_at: localDateTimeInZone(new Date(), organizationTimezone), from_currency_code: "USD", from_amount: "", to_ugx_amount: "", carrying_ugx_per_unit: "", provider: "", reference: "" });
+      setFxConversionForm({ exchange_at: localDateTimeInZone(new Date(), browserTimezone), from_currency_code: "USD", from_amount: "", to_ugx_amount: "", carrying_ugx_per_unit: "", provider: "", reference: "" });
       toast({ title: "Currency exchange recorded", description: "The foreign currency was moved to UGX, and any gain or loss was posted." });
       await loadBooks();
     } catch (error) {
@@ -520,22 +514,6 @@ const BooksPage = () => {
     } finally {
       setSaving(false);
     }
-  };
-
-  const saveBooksTimezone = async () => {
-    if (!organizationId) return;
-    const operation: BooksOperation = "books.timezone.save";
-    const correlationId = newCorrelationId();
-    const timezone = timezoneForm.trim();
-    const { error } = await supabase.rpc("update_books_timezone", { target_organization_id: organizationId, target_timezone: timezone });
-    if (error) {
-      reportBooksError(operation, correlationId, organizationId, null, error);
-      toast({ title: "Timezone not saved", description: error.message, variant: "destructive" });
-      return;
-    }
-    setOrganizationTimezone(timezone);
-    setFxConversionForm((current) => ({ ...current, exchange_at: localDateTimeInZone(new Date(), timezone) }));
-    toast({ title: "Timezone saved" });
   };
 
   const saveTaxProfile = async () => {
@@ -668,12 +646,6 @@ const BooksPage = () => {
   const fxPreviewDifference = fxImpliedRate !== null && fxCarryingRate > 0 ? Math.round((fxToAmount - fxFromAmount * fxCarryingRate) * 10000) / 10000 : null;
   const currencyExchangeCard = !isPersonalWorkspace && isWorkerAccount !== true ? (
     <>
-      <Card>
-        <CardContent className="flex flex-col gap-3 p-4 sm:flex-row sm:items-end">
-          <Field label="Timezone for exchange times"><Input value={timezoneForm} onChange={(event) => setTimezoneForm(event.target.value)} placeholder="Africa/Kampala" /></Field>
-          {timezoneForm.trim() !== organizationTimezone && <Button type="button" variant="outline" onClick={() => void saveBooksTimezone()}>Save timezone</Button>}
-        </CardContent>
-      </Card>
       <EntryCard title="Record currency exchange" onSubmit={saveFxConversion} saving={saving}>
         <p className="text-sm text-muted-foreground">Record a real exchange, such as USD sold at a bank or forex bureau for UGX. Fill in any two of the three amounts and the third is worked out for you. The carrying rate is the rate you recorded when you got the foreign currency.</p>
         <div className="grid gap-4 md:grid-cols-4">
@@ -687,7 +659,7 @@ const BooksPage = () => {
         </div>
         {fxPreviewDifference !== null && <p className="text-sm">Implied exchange rate: 1 {fxConversionForm.from_currency_code} = {fxImpliedRate!.toLocaleString(undefined, { maximumFractionDigits: 2 })} UGX. {fxPreviewDifference === 0 ? "No realized gain or loss." : `Realized ${fxPreviewDifference > 0 ? "gain" : "loss"}: ${formatMoney(Math.abs(fxPreviewDifference), "UGX")}.`}</p>}
       </EntryCard>
-      {fxConversions.length > 0 && <DataTable headers={["Date", "Given up", "UGX received", "Carrying rate", "Gain / (loss)", "Provider", "Reference"]}>{fxConversions.map((conversion) => <tr key={conversion.id} className="border-b"><td className="p-4">{conversion.exchange_at ? formatInTimezone(conversion.exchange_at, organizationTimezone) : new Date(conversion.conversion_date).toLocaleDateString()}</td><td className="p-4">{formatMoney(Number(conversion.from_amount), conversion.from_currency_code)}</td><td className="p-4">{formatMoney(Number(conversion.to_ugx_amount), "UGX")}</td><td className="p-4 text-sm">{Number(conversion.carrying_ugx_per_unit).toLocaleString(undefined, { maximumFractionDigits: 8 })} UGX</td><td className="p-4">{formatMoney(Number(conversion.realized_fx_difference), "UGX")}</td><td className="p-4">{conversion.provider || "—"}</td><td className="p-4 font-mono text-xs">{conversion.reference || "—"}</td></tr>)}</DataTable>}
+      {fxConversions.length > 0 && <DataTable headers={["Date", "Given up", "UGX received", "Carrying rate", "Gain / (loss)", "Provider", "Reference"]}>{fxConversions.map((conversion) => <tr key={conversion.id} className="border-b"><td className="p-4">{conversion.exchange_at ? formatExchangeTime(conversion.exchange_at) : new Date(conversion.conversion_date).toLocaleDateString()}</td><td className="p-4">{formatMoney(Number(conversion.from_amount), conversion.from_currency_code)}</td><td className="p-4">{formatMoney(Number(conversion.to_ugx_amount), "UGX")}</td><td className="p-4 text-sm">{Number(conversion.carrying_ugx_per_unit).toLocaleString(undefined, { maximumFractionDigits: 8 })} UGX</td><td className="p-4">{formatMoney(Number(conversion.realized_fx_difference), "UGX")}</td><td className="p-4">{conversion.provider || "—"}</td><td className="p-4 font-mono text-xs">{conversion.reference || "—"}</td></tr>)}</DataTable>}
     </>
   ) : null;
 
