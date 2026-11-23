@@ -440,21 +440,24 @@ const TaskCreationForm: React.FC<TaskCreationFormProps> = ({
                 </Select>
 
                 {formData.settlementRateBasis === "exchange" && (
-                  <Select
-                    value={formData.settlementExchangeId}
-                    onValueChange={(value) => onFormChange("settlementExchangeId", value)}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder={exchanges.length ? "Choose which exchange sets the rate" : "No exchanges recorded in Books for this currency yet"} />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {exchanges.map((exchange) => (
-                        <SelectItem key={exchange.id} value={exchange.id}>
-                          {formatExchangeOption(exchange, formData.currency)}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <div className="space-y-2">
+                    <Label className="text-sm">Available exchange rates</Label>
+                    <Select
+                      value={formData.settlementExchangeId}
+                      onValueChange={(value) => onFormChange("settlementExchangeId", value)}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder={exchanges.length ? "Choose exchange rate" : "No exchanges recorded in Books for this currency yet"} />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {exchanges.map((exchange) => (
+                          <SelectItem key={exchange.id} value={exchange.id}>
+                            {formatExchangeOption(exchange, formData.currency)}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
                 )}
 
                 {formData.settlementRateBasis === "custom" && (
