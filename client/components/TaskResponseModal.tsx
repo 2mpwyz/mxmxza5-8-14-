@@ -450,7 +450,7 @@ export const TaskResponseModal: React.FC<TaskResponseModalProps> = ({
           {selectedAction === "accept" && (
             <div className="p-4 bg-green-50 rounded-lg border border-green-200">
               <p className="text-sm text-green-800">
-                Accepting this task will create a Todo List for it. Then you can set the task in progress and complete it.
+                Accept this task to set it in your Todo List, get in progress and complete it.
               </p>
             </div>
           )}
