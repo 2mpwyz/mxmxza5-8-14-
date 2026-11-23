@@ -91,8 +91,8 @@ const TaskPaymentPanel: React.FC<TaskPaymentPanelProps> = ({ task }) => {
             <div className="pt-1 border-t border-green-200 space-y-1">
               <p>Payment to {task.assignee_name ?? "worker"}: {payment.converted_amount.toLocaleString()} {payment.worker_currency_code}</p>
               <p>
-                Exchange rate: 1 {payment.currency_code} = {payment.fx_rate.toLocaleString(undefined, { maximumFractionDigits: 6 })} {payment.worker_currency_code}
-                {payment.fx_rate_source === "manual" ? " (entered manually)" : payment.fx_rate_fetched_at ? ` (fetched ${new Date(payment.fx_rate_fetched_at).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })})` : ""}
+                Exchange rate used: 1 {payment.currency_code} = {payment.fx_rate.toLocaleString(undefined, { maximumFractionDigits: 6 })} {payment.worker_currency_code}
+                {payment.fx_rate_source === "manual" ? " (entered manually)" : payment.fx_rate_fetched_at ? ` (live on ${new Date(payment.fx_rate_fetched_at).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })})` : ""}
               </p>
             </div>
           )}
