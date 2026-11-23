@@ -109,51 +109,24 @@ export const TaskResponseModal: React.FC<TaskResponseModalProps> = ({
 
     setIsSubmitting(true);
     try {
-      // 1. Insert task response
-      const { data: responseData, error: responseError } = await supabase
-        .from("task_responses")
-        .insert([
-          {
-            task_id: task.id,
-            worker_id: workerId,
-            action: selectedAction,
-            rate_acknowledged: selectedAction === "accept" && rateAccepted,
-            response_message:
-              selectedAction === "decline"
-                ? declineReason
-                : selectedAction === "propose"
-                  ? proposalNotes
-                  : null,
-          },
-        ])
-        .select()
-        .single();
+      const { error: submitError } = await supabase.rpc("submit_task_response", {
+        p_task_id: task.id,
+        p_worker_id: workerId,
+        p_action: selectedAction,
+        p_response_message:
+          selectedAction === "decline"
+            ? declineReason
+            : selectedAction === "propose"
+              ? proposalNotes
+              : null,
+        p_rate_acknowledged: selectedAction === "propose" ? isConvertedProposal && proposalRateAccepted : selectedAction === "accept" && rateAccepted,
+        p_quoted_price: selectedAction === "propose" && quotedPrice ? parseFloat(quotedPrice) : null,
+        p_proposal_notes: selectedAction === "propose" ? proposalNotes : null,
+        p_proposed_timeline: selectedAction === "propose" ? proposedTimeline : null,
+        p_proposed_settlement_currency_code: selectedAction === "propose" ? proposalSettlementCurrency : null,
+      });
 
-      if (responseError) throw responseError;
-
-      // 2. If proposing, create proposal record
-      if (selectedAction === "propose") {
-        const { error: proposalError } = await supabase
-          .from("task_proposals")
-          .insert([
-            {
-              task_id: task.id,
-              worker_id: workerId,
-              manager_id: task.created_by,
-              status: "pending",
-              quoted_price: quotedPrice ? parseFloat(quotedPrice) : null,
-              proposal_notes: proposalNotes,
-              proposed_timeline: proposedTimeline,
-              proposed_settlement_currency_code: proposalSettlementCurrency,
-              rate_acknowledged: isConvertedProposal && proposalRateAccepted,
-            },
-          ]);
-
-        if (proposalError) throw proposalError;
-      }
-
-      // 3. If accepting, task system will create todo via trigger
-      // Just notify the user
+      if (submitError) throw submitError;
 
       toast({
         title: "Success",
