@@ -434,30 +434,27 @@ const TaskCreationForm: React.FC<TaskCreationFormProps> = ({
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="live">Today's rate</SelectItem>
-                    {canUseExchange && <SelectItem value="exchange">Rate from a recorded exchange in Books</SelectItem>}
+                    {canUseExchange && <SelectItem value="exchange">Available exchange rates</SelectItem>}
                     <SelectItem value="custom">Custom rate</SelectItem>
                   </SelectContent>
                 </Select>
 
                 {formData.settlementRateBasis === "exchange" && (
-                  <div className="space-y-2">
-                    <Label className="text-sm">Available exchange rates</Label>
-                    <Select
-                      value={formData.settlementExchangeId}
-                      onValueChange={(value) => onFormChange("settlementExchangeId", value)}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder={exchanges.length ? "Choose exchange rate" : "No exchanges recorded in Books for this currency yet"} />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {exchanges.map((exchange) => (
-                          <SelectItem key={exchange.id} value={exchange.id}>
-                            {formatExchangeOption(exchange, formData.currency)}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
+                  <Select
+                    value={formData.settlementExchangeId}
+                    onValueChange={(value) => onFormChange("settlementExchangeId", value)}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder={exchanges.length ? "Choose exchange rate" : "No exchanges recorded in Books for this currency yet"} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {exchanges.map((exchange) => (
+                        <SelectItem key={exchange.id} value={exchange.id}>
+                          {formatExchangeOption(exchange, formData.currency)}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 )}
 
                 {formData.settlementRateBasis === "custom" && (
