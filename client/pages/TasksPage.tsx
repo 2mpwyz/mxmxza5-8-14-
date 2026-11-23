@@ -573,7 +573,7 @@ const TasksPage: React.FC = () => {
 
       const isConvertedSettlement = (formData.settlementCurrency || formData.currency) !== formData.currency;
       if (isConvertedSettlement && formData.settlementRateBasis === "exchange" && (!formData.settlementExchangeId || (formData.settlementCurrency || formData.currency) !== "UGX")) {
-        throw new Error("Choose the recorded exchange that sets this task's rate");
+        throw new Error("Choose which recorded exchange sets this task's rate");
       }
       if (isConvertedSettlement && formData.settlementRateBasis === "custom" && !(parseFloat(formData.settlementCustomRate) > 0)) {
         throw new Error("Enter a custom rate greater than zero");

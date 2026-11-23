@@ -33,7 +33,7 @@ const formatExchangeOption = (exchange: FundingExchange, currency: string) => {
     ? new Date(exchange.exchange_at).toLocaleString("en-GB", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit", timeZoneName: "short" })
     : exchange.conversion_date;
   const rate = Number(exchange.to_ugx_amount) / Number(exchange.from_amount);
-  return `${exchange.provider || "Exchange"} · ${when} · ${rate.toLocaleString(undefined, { maximumFractionDigits: 2 })} UGX per 1 ${currency}`;
+  return `${exchange.provider || "Provider not recorded"} · ${when} · ${rate.toLocaleString(undefined, { maximumFractionDigits: 2 })} UGX per 1 ${currency}`;
 };
 
 interface FormData {
@@ -434,7 +434,7 @@ const TaskCreationForm: React.FC<TaskCreationFormProps> = ({
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="live">Today's rate</SelectItem>
-                    {canUseExchange && <SelectItem value="exchange">Rate from a recorded exchange</SelectItem>}
+                    {canUseExchange && <SelectItem value="exchange">Rate from a recorded exchange in Books</SelectItem>}
                     <SelectItem value="custom">Custom rate</SelectItem>
                   </SelectContent>
                 </Select>
@@ -445,7 +445,7 @@ const TaskCreationForm: React.FC<TaskCreationFormProps> = ({
                     onValueChange={(value) => onFormChange("settlementExchangeId", value)}
                   >
                     <SelectTrigger>
-                      <SelectValue placeholder={exchanges.length ? "Choose an exchange" : "No recorded exchanges for this currency"} />
+                      <SelectValue placeholder={exchanges.length ? "Choose which exchange sets the rate" : "No exchanges recorded in Books for this currency yet"} />
                     </SelectTrigger>
                     <SelectContent>
                       {exchanges.map((exchange) => (
