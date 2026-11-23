@@ -48,7 +48,16 @@ export const TaskResponseModal: React.FC<TaskResponseModalProps> = ({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [rateAccepted, setRateAccepted] = useState(false);
   const [liveRates, setLiveRates] = useState<Record<string, number> | null>(null);
+  const [proposalRate, setProposalRate] = useState<{ fx_rate: number; rate_fetched_at: string | null } | null>(null);
+  const [proposalRateError, setProposalRateError] = useState<string | null>(null);
+  const [proposalRateAccepted, setProposalRateAccepted] = useState(false);
   const isConvertedRate = !!task && task.settlement_currency_code !== task.currency_code && !!task.settlement_fx_rate;
+  const proposalSettlementCurrency =
+    proposedSettlementCurrency || task?.settlement_currency_code || task?.currency_code || "";
+  const isConvertedProposal = !!task && proposalSettlementCurrency !== task.currency_code;
+  const rateGateBlocked =
+    (selectedAction === "accept" && isConvertedRate && !rateAccepted) ||
+    (selectedAction === "propose" && isConvertedProposal && (!proposalRate || !proposalRateAccepted));
 
   useEffect(() => {
     if (!isOpen || !isConvertedRate || liveRates) return;
@@ -63,11 +72,40 @@ export const TaskResponseModal: React.FC<TaskResponseModalProps> = ({
     })();
   }, [isOpen, isConvertedRate, liveRates]);
 
+  useEffect(() => {
+    if (!isOpen || selectedAction !== "propose" || !task || !isConvertedProposal) {
+      setProposalRate(null);
+      setProposalRateError(null);
+      setProposalRateAccepted(false);
+      return;
+    }
+    let cancelled = false;
+    setProposalRate(null);
+    setProposalRateError(null);
+    setProposalRateAccepted(false);
+    void (async () => {
+      const { data, error } = await supabase.rpc("preview_task_settlement_rate", {
+        p_task_id: task.id,
+        p_settlement_currency: proposalSettlementCurrency,
+      });
+      if (cancelled) return;
+      if (error) {
+        setProposalRateError(error.message);
+        return;
+      }
+      const row = Array.isArray(data) ? data[0] : data;
+      setProposalRate(row ?? null);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [isOpen, selectedAction, task?.id, isConvertedProposal, proposalSettlementCurrency]);
+
   if (!task) return null;
 
   const handleSubmitResponse = async () => {
     if (!selectedAction) return;
-    if (selectedAction === "accept" && isConvertedRate && !rateAccepted) return;
+    if (rateGateBlocked) return;
 
     setIsSubmitting(true);
     try {
@@ -79,6 +117,7 @@ export const TaskResponseModal: React.FC<TaskResponseModalProps> = ({
             task_id: task.id,
             worker_id: workerId,
             action: selectedAction,
+            rate_acknowledged: selectedAction === "accept" && rateAccepted,
             response_message:
               selectedAction === "decline"
                 ? declineReason
@@ -105,8 +144,8 @@ export const TaskResponseModal: React.FC<TaskResponseModalProps> = ({
               quoted_price: quotedPrice ? parseFloat(quotedPrice) : null,
               proposal_notes: proposalNotes,
               proposed_timeline: proposedTimeline,
-              proposed_settlement_currency_code:
-                proposedSettlementCurrency || task.settlement_currency_code || task.currency_code,
+              proposed_settlement_currency_code: proposalSettlementCurrency,
+              rate_acknowledged: isConvertedProposal && proposalRateAccepted,
             },
           ]);
 
@@ -134,6 +173,7 @@ export const TaskResponseModal: React.FC<TaskResponseModalProps> = ({
       setProposedTimeline("");
       setProposedSettlementCurrency("");
       setRateAccepted(false);
+      setProposalRateAccepted(false);
       onClose();
       onResponseSubmitted?.();
     } catch (error) {
@@ -381,9 +421,42 @@ export const TaskResponseModal: React.FC<TaskResponseModalProps> = ({
                   ))}
                 </select>
                 <p className="text-xs text-gray-600 mt-2">
-                  If different from the task currency, the exchange rate is recorded when the manager accepts.
+                  If different from the task currency, the rate below applies when the manager accepts.
                 </p>
               </div>
+
+              {isConvertedProposal && (
+                <div className="p-3 bg-amber-50 rounded-lg border border-amber-200 space-y-3">
+                  {proposalRateError ? (
+                    <p className="text-sm text-red-700">{proposalRateError}</p>
+                  ) : !proposalRate ? (
+                    <p className="text-sm text-amber-900">Loading the exchange rate...</p>
+                  ) : (
+                    <>
+                      <p className="text-sm text-amber-900">
+                        If the manager accepts, you will be paid in {proposalSettlementCurrency} at this rate:{" "}
+                        <span className="font-semibold">
+                          1 {task.currency_code} = {Number(proposalRate.fx_rate).toLocaleString(undefined, { maximumFractionDigits: 8 })} {proposalSettlementCurrency}
+                        </span>
+                      </p>
+                      {proposalRate.rate_fetched_at && (
+                        <p className="text-xs text-amber-800">
+                          Rate taken {new Date(proposalRate.rate_fetched_at).toLocaleString()}
+                        </p>
+                      )}
+                      <label className="flex items-start gap-2 text-sm text-amber-900">
+                        <input
+                          type="checkbox"
+                          checked={proposalRateAccepted}
+                          onChange={(e) => setProposalRateAccepted(e.target.checked)}
+                          className="mt-1"
+                        />
+                        <span>I accept this rate for this proposal.</span>
+                      </label>
+                    </>
+                  )}
+                </div>
+              )}
 
               <div>
                 <Label htmlFor="proposal-notes" className="font-semibold">
@@ -448,7 +521,7 @@ export const TaskResponseModal: React.FC<TaskResponseModalProps> = ({
           </Button>
           <Button
             onClick={handleSubmitResponse}
-            disabled={!selectedAction || isSubmitting || (selectedAction === "accept" && isConvertedRate && !rateAccepted)}
+            disabled={!selectedAction || isSubmitting || rateGateBlocked}
             className={
               selectedAction === "accept"
                 ? "bg-green-600 hover:bg-green-700 text-white"

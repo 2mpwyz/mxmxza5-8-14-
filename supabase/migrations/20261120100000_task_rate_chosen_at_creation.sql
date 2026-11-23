@@ -114,7 +114,11 @@ $$;
 
 alter table public.task_responses
   add column if not exists accepted_settlement_fx_rate numeric(20,8),
-  add column if not exists accepted_settlement_fx_rate_source text;
+  add column if not exists accepted_settlement_fx_rate_source text,
+  add column if not exists rate_acknowledged boolean not null default false;
+
+alter table public.task_proposals
+  add column if not exists rate_acknowledged boolean not null default false;
 
 create or replace function public.record_task_acceptance_rate()
 returns trigger
@@ -129,6 +133,9 @@ begin
 
   select * into task_row from public.tasks where id = new.task_id;
   if found and task_row.settlement_currency_code <> task_row.currency_code then
+    if not new.rate_acknowledged then
+      raise exception 'Accept the settlement exchange rate before accepting this task';
+    end if;
     new.accepted_settlement_fx_rate := task_row.settlement_fx_rate;
     new.accepted_settlement_fx_rate_source := task_row.settlement_fx_rate_source;
   end if;
@@ -140,3 +147,61 @@ drop trigger if exists record_task_acceptance_rate on public.task_responses;
 create trigger record_task_acceptance_rate
   before insert on public.task_responses
   for each row execute function public.record_task_acceptance_rate();
+
+create or replace function public.require_proposal_rate_acknowledgement()
+returns trigger
+language plpgsql
+security definer
+set search_path = pg_catalog, public
+as $$
+declare
+  task_currency text;
+begin
+  if new.proposed_settlement_currency_code is null then return new; end if;
+
+  select currency_code into task_currency from public.tasks where id = new.task_id;
+  if found and new.proposed_settlement_currency_code <> task_currency and not new.rate_acknowledged then
+    raise exception 'Accept the settlement exchange rate before submitting this proposal';
+  end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists require_proposal_rate_acknowledgement on public.task_proposals;
+create trigger require_proposal_rate_acknowledgement
+  before insert on public.task_proposals
+  for each row execute function public.require_proposal_rate_acknowledgement();
+
+create or replace function public.preview_task_settlement_rate(
+  p_task_id uuid,
+  p_settlement_currency text
+)
+returns table (fx_rate numeric, rate_fetched_at timestamptz)
+language plpgsql
+security definer
+set search_path = pg_catalog, public
+as $$
+declare
+  task_currency text;
+  rate_row record;
+begin
+  if auth.uid() is null then raise exception 'Sign in to preview a settlement rate'; end if;
+
+  select currency_code into task_currency from public.tasks where id = p_task_id;
+  if not found then raise exception 'Task not found'; end if;
+  if p_settlement_currency not in ('UGX', 'USD') or p_settlement_currency = task_currency then
+    raise exception 'Settlement currency must be UGX or USD, different from the task currency';
+  end if;
+
+  select * into rate_row
+    from public.books_task_payment_fx_rate(task_currency::char(3), p_settlement_currency::char(3));
+  if rate_row.rate_status <> 'stored' then
+    raise exception 'FX_RATE_UNAVAILABLE: No current stored % to % rate exists.', task_currency, p_settlement_currency;
+  end if;
+
+  return query select rate_row.fx_rate, rate_row.rate_fetched_at;
+end;
+$$;
+
+revoke all on function public.preview_task_settlement_rate(uuid, text) from public, anon;
+grant execute on function public.preview_task_settlement_rate(uuid, text) to authenticated;
