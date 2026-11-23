@@ -414,10 +414,10 @@ const TaskCreationForm: React.FC<TaskCreationFormProps> = ({
               {needsConversion && (
                 <p className="text-xs text-muted-foreground">
                   {fxError
-                    ? `Live rate unavailable (${fxError}). The server records the rate when the task is saved.`
+                    ? `Today's rate is unavailable (${fxError}). The rate is set when the task is saved.`
                     : indicativeRate
-                      ? `Indicative rate: 1 ${formData.currency} = ${indicativeRate.toLocaleString(undefined, { maximumFractionDigits: 8 })} ${settlementCurrency}. The saved task records the rate the server resolves.`
-                      : "Loading live rate..."}
+                      ? `Today's rate: 1 ${formData.currency} = ${indicativeRate.toLocaleString(undefined, { maximumFractionDigits: 8 })} ${settlementCurrency}. This is only a preview. The task saves the rate chosen below.`
+                      : "Loading today's rate..."}
                 </p>
               )}
             </div>
@@ -433,8 +433,8 @@ const TaskCreationForm: React.FC<TaskCreationFormProps> = ({
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="live">Live stored rate</SelectItem>
-                    {canUseExchange && <SelectItem value="exchange">A recorded exchange</SelectItem>}
+                    <SelectItem value="live">Today's rate</SelectItem>
+                    {canUseExchange && <SelectItem value="exchange">Rate from a recorded exchange</SelectItem>}
                     <SelectItem value="custom">Custom rate</SelectItem>
                   </SelectContent>
                 </Select>
@@ -468,7 +468,7 @@ const TaskCreationForm: React.FC<TaskCreationFormProps> = ({
                 )}
 
                 <p className="text-xs text-muted-foreground">
-                  The worker sees this rate and must accept it before starting. It stays fixed for this task.
+                  The worker will see this rate and must accept it before starting. It does not change after the task is saved.
                 </p>
               </div>
             )}
