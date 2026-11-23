@@ -139,6 +139,7 @@ export interface Task {
   settlement_fx_rate: number | null
   settlement_fx_rate_source: SettlementRateSource | null
   settlement_fx_rate_fetched_at: string | null
+  settlement_fx_conversion_id: string | null
   created_by: string
   created_at: string
   updated_at: string

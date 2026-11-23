@@ -51,6 +51,13 @@ export const TaskResponseModal: React.FC<TaskResponseModalProps> = ({
   const [proposalRate, setProposalRate] = useState<{ fx_rate: number; rate_fetched_at: string | null } | null>(null);
   const [proposalRateError, setProposalRateError] = useState<string | null>(null);
   const [proposalRateAccepted, setProposalRateAccepted] = useState(false);
+  const [bookedExchange, setBookedExchange] = useState<{
+    provider: string | null;
+    conversion_date: string;
+    exchange_at: string | null;
+    from_amount: number;
+    to_ugx_amount: number;
+  } | null>(null);
   const isConvertedRate = !!task && task.settlement_currency_code !== task.currency_code && !!task.settlement_fx_rate;
   const proposalSettlementCurrency =
     proposedSettlementCurrency || task?.settlement_currency_code || task?.currency_code || "";
@@ -71,6 +78,26 @@ export const TaskResponseModal: React.FC<TaskResponseModalProps> = ({
       }
     })();
   }, [isOpen, isConvertedRate, liveRates]);
+
+  useEffect(() => {
+    const conversionId = task?.settlement_fx_conversion_id;
+    if (!isOpen || task?.settlement_fx_rate_source !== "books_exchange" || !conversionId) {
+      setBookedExchange(null);
+      return;
+    }
+    let cancelled = false;
+    void (async () => {
+      const { data } = await supabase
+        .from("books_fx_conversions")
+        .select("provider, conversion_date, exchange_at, from_amount, to_ugx_amount")
+        .eq("id", conversionId)
+        .maybeSingle();
+      if (!cancelled) setBookedExchange(data ?? null);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [isOpen, task?.settlement_fx_conversion_id, task?.settlement_fx_rate_source]);
 
   useEffect(() => {
     if (!isOpen || selectedAction !== "propose" || !task || !isConvertedProposal) {
@@ -464,7 +491,20 @@ export const TaskResponseModal: React.FC<TaskResponseModalProps> = ({
                 </span>
               </p>
               <p className="text-xs text-amber-800">
-                {task.settlement_fx_rate_source === "books_exchange" ? "This rate came from a recorded exchange in Books." : task.settlement_fx_rate_source === "hotel_edited" ? "This rate was set by the hotel." : "This rate came from Exchangerate."}
+                {task.settlement_fx_rate_source === "books_exchange"
+                  ? bookedExchange
+                    ? `This rate was provided by ${bookedExchange.provider || "provider not recorded"} · ${
+                        bookedExchange.exchange_at
+                          ? new Date(bookedExchange.exchange_at).toLocaleString("en-GB", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit", timeZoneName: "short" })
+                          : bookedExchange.conversion_date
+                      } · ${(Number(bookedExchange.to_ugx_amount) / Number(bookedExchange.from_amount)).toLocaleString(undefined, { maximumFractionDigits: 2 })} ${task.settlement_currency_code} per 1 ${task.currency_code}.`
+                    : "This rate came from a recorded exchange in Books."
+                  : task.settlement_fx_rate_source === "hotel_edited"
+                    ? "This rate was set by the hotel."
+                    : "This rate is live at Exchangerate."}
+                {liveRates?.[task.settlement_currency_code] && liveRates?.[task.currency_code]
+                  ? ` Today's rate: 1 ${task.currency_code} = ${(liveRates[task.settlement_currency_code] / liveRates[task.currency_code]).toLocaleString(undefined, { maximumFractionDigits: 8 })} ${task.settlement_currency_code}. This is for comparison only and does not change your pay.`
+                  : ""}
               </p>
               <label className="flex items-start gap-2 text-sm text-amber-900">
                 <input
