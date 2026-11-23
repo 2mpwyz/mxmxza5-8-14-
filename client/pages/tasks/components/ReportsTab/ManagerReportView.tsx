@@ -362,7 +362,7 @@ const ManagerReportView: React.FC<ManagerReportViewProps> = ({
                 Worker is paid in {task.settlement_currency_code} at 1 {task.currency_code} = {task.settlement_fx_rate === null ? "?" : Number(task.settlement_fx_rate).toLocaleString(undefined, { maximumFractionDigits: 8 })} {task.settlement_currency_code}
                 {task.settlement_fx_rate_source === "stored" ? " (live rate)" : task.settlement_fx_rate_source === "books_exchange" ? " (from a recorded exchange in Books)" : task.settlement_fx_rate_source === "hotel_edited" || task.settlement_fx_rate_source === "hotel_approved" ? " (set by the hotel)" : task.settlement_fx_rate_source === "manual" ? " (entered manually)" : ""}
               </p>
-              <label htmlFor="settlement-action" className="block font-medium">Which exchange rate should be used when you approve?</label>
+              <label htmlFor="settlement-action" className="block font-medium">The exchange rate used here:</label>
               <select
                 id="settlement-action"
                 value={settlementAction}
