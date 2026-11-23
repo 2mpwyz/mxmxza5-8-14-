@@ -82,17 +82,17 @@ const TaskPaymentPanel: React.FC<TaskPaymentPanelProps> = ({ task }) => {
       {payment ? (
         <div className={`p-4 rounded-lg text-sm space-y-1 ${payment.confirmation_status !== "pending_confirmation" ? "bg-green-50 border border-green-200 text-green-800" : "bg-amber-50 border border-amber-200 text-amber-900"}`}>
           <p className="font-semibold">
-            {payment.confirmation_status === "confirmed" ? "Worker confirmed receipt" : payment.confirmation_status === "legacy_settled" ? "Paid before worker confirmation tracking" : "Payment recorded · awaiting worker confirmation"} · {payment.amount.toLocaleString()} {payment.currency_code} on {new Date(payment.paid_at).toLocaleDateString()}
+            {payment.confirmation_status === "confirmed" ? "Worker confirmed receipt" : payment.confirmation_status === "legacy_settled" ? "Paid before worker confirmation tracking" : "Payment recorded · awaiting the worker's confirmation"} · {payment.amount.toLocaleString()} {payment.currency_code} on {new Date(payment.paid_at).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}
           </p>
           {payment.tax_amount > 0 && (
             <p>VAT included: {payment.tax_amount.toLocaleString()} {payment.currency_code}</p>
           )}
           {payment.worker_currency_code && payment.worker_currency_code !== payment.currency_code && payment.fx_rate !== null && payment.converted_amount !== null && (
             <div className="pt-1 border-t border-green-200 space-y-1">
-              <p>{payment.confirmation_status === "confirmed" ? "Worker Books amount" : "Worker Books amount after confirmation"}: {payment.converted_amount.toLocaleString()} {payment.worker_currency_code}</p>
+              <p>Payment to {task.assignee_name ?? "worker"}: {payment.converted_amount.toLocaleString()} {payment.worker_currency_code}</p>
               <p>
-                Rate applied: 1 {payment.currency_code} = {payment.fx_rate.toLocaleString(undefined, { maximumFractionDigits: 6 })} {payment.worker_currency_code}
-                {payment.fx_rate_source === "manual" ? " (manual)" : payment.fx_rate_fetched_at ? ` (stored, fetched ${new Date(payment.fx_rate_fetched_at).toLocaleDateString()})` : ""}
+                Exchange rate: 1 {payment.currency_code} = {payment.fx_rate.toLocaleString(undefined, { maximumFractionDigits: 6 })} {payment.worker_currency_code}
+                {payment.fx_rate_source === "manual" ? " (entered manually)" : payment.fx_rate_fetched_at ? ` (fetched ${new Date(payment.fx_rate_fetched_at).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })})` : ""}
               </p>
             </div>
           )}
