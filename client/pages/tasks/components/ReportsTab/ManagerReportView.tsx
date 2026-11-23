@@ -362,16 +362,16 @@ const ManagerReportView: React.FC<ManagerReportViewProps> = ({
                 Worker is paid in {task.settlement_currency_code} at 1 {task.currency_code} = {task.settlement_fx_rate === null ? "?" : Number(task.settlement_fx_rate).toLocaleString(undefined, { maximumFractionDigits: 8 })} {task.settlement_currency_code}
                 {task.settlement_fx_rate_source === "stored" ? " (live rate)" : task.settlement_fx_rate_source === "books_exchange" ? " (from a recorded exchange in Books)" : task.settlement_fx_rate_source === "hotel_edited" || task.settlement_fx_rate_source === "hotel_approved" ? " (set by the hotel)" : task.settlement_fx_rate_source === "manual" ? " (entered manually)" : ""}
               </p>
-              <label htmlFor="settlement-action" className="block font-medium">Exchange rate at approval</label>
+              <label htmlFor="settlement-action" className="block font-medium">Which exchange rate should be used when you approve?</label>
               <select
                 id="settlement-action"
                 value={settlementAction}
                 onChange={(event) => setSettlementAction(event.target.value as "keep" | "refresh" | "edit")}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-white"
               >
-                <option value="keep">Keep the agreed rate</option>
-                <option value="refresh">Update to today's live rate</option>
-                <option value="edit">Enter a different rate</option>
+                <option value="keep">Keep the rate agreed with the worker</option>
+                <option value="refresh">Use today's live rate</option>
+                <option value="edit">Enter a new rate</option>
               </select>
               {settlementAction === "edit" && (
                 <input
@@ -380,7 +380,7 @@ const ManagerReportView: React.FC<ManagerReportViewProps> = ({
                   step="any"
                   value={approvalManualRate}
                   onChange={(event) => setApprovalManualRate(event.target.value)}
-                  placeholder="Settlement units per 1 task currency unit"
+                  placeholder={`How many ${task.settlement_currency_code} for 1 ${task.currency_code}`}
                   aria-label="Edited settlement rate"
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-white"
                 />
