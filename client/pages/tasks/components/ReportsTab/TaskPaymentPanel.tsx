@@ -21,13 +21,9 @@ const TaskPaymentPanel: React.FC<TaskPaymentPanelProps> = ({ task }) => {
   const [isSaving, setIsSaving] = useState(false);
   const [method, setMethod] = useState<WorkerTaskPayment["payment_method"]>("bank_transfer");
   const [reference, setReference] = useState("");
-  const [manualRateInput, setManualRateInput] = useState("");
-  const [fxIssue, setFxIssue] = useState<string | null>(null);
 
   const agreedAmount = task.final_amount ?? 0;
   const hasAgreedAmount = agreedAmount > 0;
-  const manualRate = manualRateInput.trim() === "" ? null : Number(manualRateInput);
-  const isManualRateValid = manualRate === null || (Number.isFinite(manualRate) && manualRate > 0);
 
   const loadPayment = async () => {
     const { data, error } = await supabase
@@ -55,30 +51,19 @@ const TaskPaymentPanel: React.FC<TaskPaymentPanelProps> = ({ task }) => {
       toast({ title: "Reference required", description: "Enter the payment reference before recording.", variant: "destructive" });
       return;
     }
-    if (!isManualRateValid) {
-      toast({ title: "Invalid rate", description: "The manual FX rate must be greater than zero.", variant: "destructive" });
-      return;
-    }
     setIsSaving(true);
     const { error } = await supabase.rpc("record_worker_task_payment", {
       p_task_id: task.id,
       p_payment_method: method,
       p_payment_reference: trimmedReference,
-      p_manual_fx_rate: manualRate,
     });
     setIsSaving(false);
     if (error) {
-      if (error.message.startsWith("FX_RATE_")) {
-        setFxIssue(error.message.replace(/^FX_RATE_\w+:\s*/, ""));
-        return;
-      }
       toast({ title: "Payment not recorded", description: error.message, variant: "destructive" });
       return;
     }
     toast({ title: "Payment recorded", description: "The worker will be asked to confirm receipt before the receipt is issued." });
     setReference("");
-    setManualRateInput("");
-    setFxIssue(null);
     void loadPayment();
   };
 
@@ -97,17 +82,17 @@ const TaskPaymentPanel: React.FC<TaskPaymentPanelProps> = ({ task }) => {
       {payment ? (
         <div className={`p-4 rounded-lg text-sm space-y-1 ${payment.confirmation_status !== "pending_confirmation" ? "bg-green-50 border border-green-200 text-green-800" : "bg-amber-50 border border-amber-200 text-amber-900"}`}>
           <p className="font-semibold">
-            {payment.confirmation_status === "confirmed" ? "Worker confirmed receipt" : payment.confirmation_status === "legacy_settled" ? "Paid before worker confirmation tracking" : "Payment recorded · awaiting worker confirmation"} · {payment.amount.toLocaleString()} {payment.currency_code} on {new Date(payment.paid_at).toLocaleDateString()}
+            {payment.confirmation_status === "confirmed" ? "Worker confirmed receipt" : payment.confirmation_status === "legacy_settled" ? "Paid before worker confirmation tracking" : "Payment recorded · awaiting the worker's confirmation"} · {payment.amount.toLocaleString()} {payment.currency_code} on {new Date(payment.paid_at).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}
           </p>
           {payment.tax_amount > 0 && (
             <p>VAT included: {payment.tax_amount.toLocaleString()} {payment.currency_code}</p>
           )}
           {payment.worker_currency_code && payment.worker_currency_code !== payment.currency_code && payment.fx_rate !== null && payment.converted_amount !== null && (
             <div className="pt-1 border-t border-green-200 space-y-1">
-              <p>{payment.confirmation_status === "confirmed" ? "Worker Books amount" : "Worker Books amount after confirmation"}: {payment.converted_amount.toLocaleString()} {payment.worker_currency_code}</p>
+              <p>Payment to {task.assignee_name ?? "worker"}: {payment.converted_amount.toLocaleString()} {payment.worker_currency_code}</p>
               <p>
-                Rate applied: 1 {payment.currency_code} = {payment.fx_rate.toLocaleString(undefined, { maximumFractionDigits: 6 })} {payment.worker_currency_code}
-                {payment.fx_rate_source === "manual" ? " (manual)" : payment.fx_rate_fetched_at ? ` (stored, fetched ${new Date(payment.fx_rate_fetched_at).toLocaleDateString()})` : ""}
+                Exchange rate used: 1 {payment.currency_code} = {payment.fx_rate.toLocaleString(undefined, { maximumFractionDigits: 6 })} {payment.worker_currency_code}
+                {payment.fx_rate_source === "manual" ? " (entered manually)" : payment.fx_rate_fetched_at ? ` (live on ${new Date(payment.fx_rate_fetched_at).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })})` : ""}
               </p>
             </div>
           )}
@@ -131,24 +116,11 @@ const TaskPaymentPanel: React.FC<TaskPaymentPanelProps> = ({ task }) => {
               ))}
             </select>
           </div>
-          {fxIssue && (
-            <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-800 space-y-2">
-              <p>{fxIssue}</p>
-              <label htmlFor="worker-payment-manual-rate" className="block font-medium">
-                Manual exchange rate (units of worker Books currency per 1 hotel currency unit)
-              </label>
-              <input
-                id="worker-payment-manual-rate"
-                type="number"
-                min="0"
-                step="any"
-                value={manualRateInput}
-                onChange={(event) => setManualRateInput(event.target.value)}
-                placeholder="e.g. 0.00027"
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-white"
-              />
+          {task.settlement_currency_code && task.settlement_currency_code !== task.currency_code && task.settlement_fx_rate ? (
+            <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg text-sm text-blue-900">
+              Paid in {task.settlement_currency_code} at the agreed rate: 1 {task.currency_code} = {Number(task.settlement_fx_rate).toLocaleString(undefined, { maximumFractionDigits: 8 })} {task.settlement_currency_code}
             </div>
-          )}
+          ) : null}
           <div>
             <label htmlFor="worker-payment-reference" className="block text-sm font-medium text-gray-700 mb-1">
               Payment reference
@@ -165,10 +137,7 @@ const TaskPaymentPanel: React.FC<TaskPaymentPanelProps> = ({ task }) => {
           <button
             type="button"
             onClick={() => void handleRecordPayment()}
-            disabled={
-              !hasAgreedAmount || isSaving || !reference.trim() ||
-              (fxIssue !== null && (manualRate === null || !isManualRateValid))
-            }
+            disabled={!hasAgreedAmount || isSaving || !reference.trim()}
             className="px-4 py-2 bg-sheraton-gold text-sheraton-navy rounded-lg font-semibold disabled:opacity-50"
           >
             {isSaving ? "Recording..." : "Record payment"}

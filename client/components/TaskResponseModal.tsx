@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   Dialog,
   DialogContent,
@@ -16,7 +16,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 import { Loader, CheckCircle, XCircle, MessageSquare } from "lucide-react";
 import { supabase, Task as TaskType } from "../lib/supabase";
 import { formatTaskDeadline } from "../lib/taskDeadline";
-import { formatTaskAmount, getTaskAmount } from "../lib/taskCurrency";
+import { formatTaskAmount, getTaskAmount, TASK_CURRENCIES } from "../lib/taskCurrency";
 import DeadlineCountdown from "./DeadlineCountdown";
 import { toast } from "../hooks/use-toast";
 
@@ -44,57 +44,102 @@ export const TaskResponseModal: React.FC<TaskResponseModalProps> = ({
   const [quotedPrice, setQuotedPrice] = useState("");
   const [proposalNotes, setProposalNotes] = useState("");
   const [proposedTimeline, setProposedTimeline] = useState("");
+  const [proposedSettlementCurrency, setProposedSettlementCurrency] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [rateAccepted, setRateAccepted] = useState(false);
+  const [proposalRate, setProposalRate] = useState<{ fx_rate: number; rate_fetched_at: string | null } | null>(null);
+  const [proposalRateError, setProposalRateError] = useState<string | null>(null);
+  const [proposalRateAccepted, setProposalRateAccepted] = useState(false);
+  const [bookedExchange, setBookedExchange] = useState<{
+    provider: string | null;
+    conversion_date: string;
+    exchange_at: string | null;
+    from_amount: number;
+    to_ugx_amount: number;
+  } | null>(null);
+  const isConvertedRate = !!task && task.settlement_currency_code !== task.currency_code && !!task.settlement_fx_rate;
+  const proposalSettlementCurrency =
+    proposedSettlementCurrency || task?.settlement_currency_code || task?.currency_code || "";
+  const isConvertedProposal = !!task && proposalSettlementCurrency !== task.currency_code;
+  const rateGateBlocked =
+    (selectedAction === "accept" && isConvertedRate && !rateAccepted) ||
+    (selectedAction === "propose" && isConvertedProposal && (!proposalRate || !proposalRateAccepted));
+
+  useEffect(() => {
+    const conversionId = task?.settlement_fx_conversion_id;
+    if (!isOpen || task?.settlement_fx_rate_source !== "books_exchange" || !conversionId) {
+      setBookedExchange(null);
+      return;
+    }
+    let cancelled = false;
+    void (async () => {
+      const { data } = await supabase
+        .from("books_fx_conversions")
+        .select("provider, conversion_date, exchange_at, from_amount, to_ugx_amount")
+        .eq("id", conversionId)
+        .maybeSingle();
+      if (!cancelled) setBookedExchange(data ?? null);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [isOpen, task?.settlement_fx_conversion_id, task?.settlement_fx_rate_source]);
+
+  useEffect(() => {
+    if (!isOpen || selectedAction !== "propose" || !task || !isConvertedProposal) {
+      setProposalRate(null);
+      setProposalRateError(null);
+      setProposalRateAccepted(false);
+      return;
+    }
+    let cancelled = false;
+    setProposalRate(null);
+    setProposalRateError(null);
+    setProposalRateAccepted(false);
+    void (async () => {
+      const { data, error } = await supabase.rpc("preview_task_settlement_rate", {
+        p_task_id: task.id,
+        p_settlement_currency: proposalSettlementCurrency,
+      });
+      if (cancelled) return;
+      if (error) {
+        setProposalRateError(error.message);
+        return;
+      }
+      const row = Array.isArray(data) ? data[0] : data;
+      setProposalRate(row ?? null);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [isOpen, selectedAction, task?.id, isConvertedProposal, proposalSettlementCurrency]);
 
   if (!task) return null;
 
   const handleSubmitResponse = async () => {
     if (!selectedAction) return;
+    if (rateGateBlocked) return;
 
     setIsSubmitting(true);
     try {
-      // 1. Insert task response
-      const { data: responseData, error: responseError } = await supabase
-        .from("task_responses")
-        .insert([
-          {
-            task_id: task.id,
-            worker_id: workerId,
-            action: selectedAction,
-            response_message:
-              selectedAction === "decline"
-                ? declineReason
-                : selectedAction === "propose"
-                  ? proposalNotes
-                  : null,
-          },
-        ])
-        .select()
-        .single();
+      const { error: submitError } = await supabase.rpc("submit_task_response", {
+        p_task_id: task.id,
+        p_worker_id: workerId,
+        p_action: selectedAction,
+        p_response_message:
+          selectedAction === "decline"
+            ? declineReason
+            : selectedAction === "propose"
+              ? proposalNotes
+              : null,
+        p_rate_acknowledged: selectedAction === "propose" ? isConvertedProposal && proposalRateAccepted : selectedAction === "accept" && rateAccepted,
+        p_quoted_price: selectedAction === "propose" && quotedPrice ? parseFloat(quotedPrice) : null,
+        p_proposal_notes: selectedAction === "propose" ? proposalNotes : null,
+        p_proposed_timeline: selectedAction === "propose" ? proposedTimeline : null,
+        p_proposed_settlement_currency_code: selectedAction === "propose" ? proposalSettlementCurrency : null,
+      });
 
-      if (responseError) throw responseError;
-
-      // 2. If proposing, create proposal record
-      if (selectedAction === "propose") {
-        const { error: proposalError } = await supabase
-          .from("task_proposals")
-          .insert([
-            {
-              task_id: task.id,
-              worker_id: workerId,
-              manager_id: task.created_by,
-              status: "pending",
-              quoted_price: quotedPrice ? parseFloat(quotedPrice) : null,
-              proposal_notes: proposalNotes,
-              proposed_timeline: proposedTimeline,
-            },
-          ]);
-
-        if (proposalError) throw proposalError;
-      }
-
-      // 3. If accepting, task system will create todo via trigger
-      // Just notify the user
+      if (submitError) throw submitError;
 
       toast({
         title: "Success",
@@ -112,6 +157,9 @@ export const TaskResponseModal: React.FC<TaskResponseModalProps> = ({
       setQuotedPrice("");
       setProposalNotes("");
       setProposedTimeline("");
+      setProposedSettlementCurrency("");
+      setRateAccepted(false);
+      setProposalRateAccepted(false);
       onClose();
       onResponseSubmitted?.();
     } catch (error) {
@@ -340,6 +388,63 @@ export const TaskResponseModal: React.FC<TaskResponseModalProps> = ({
               </div>
 
               <div>
+                <Label htmlFor="proposed-settlement-currency" className="font-semibold">
+                  Settlement Currency
+                </Label>
+                <select
+                  id="proposed-settlement-currency"
+                  value={proposedSettlementCurrency}
+                  onChange={(e) => setProposedSettlementCurrency(e.target.value)}
+                  className="w-full mt-2 px-3 py-2 border border-gray-300 rounded-md text-sm bg-white"
+                >
+                  <option value="">
+                    Same as task ({task.settlement_currency_code || task.currency_code})
+                  </option>
+                  {TASK_CURRENCIES.map((currency) => (
+                    <option key={currency.code} value={currency.code}>
+                      {currency.label}
+                    </option>
+                  ))}
+                </select>
+                <p className="text-xs text-gray-600 mt-2">
+                  If different from the task currency, the rate below applies when the manager accepts.
+                </p>
+              </div>
+
+              {isConvertedProposal && (
+                <div className="p-3 bg-amber-50 rounded-lg border border-amber-200 space-y-3">
+                  {proposalRateError ? (
+                    <p className="text-sm text-red-700">{proposalRateError}</p>
+                  ) : !proposalRate ? (
+                    <p className="text-sm text-amber-900">Loading the exchange rate...</p>
+                  ) : (
+                    <>
+                      <p className="text-sm text-amber-900">
+                        If the manager accepts, you will be paid in {proposalSettlementCurrency} at this rate:{" "}
+                        <span className="font-semibold">
+                          1 {task.currency_code} = {Number(proposalRate.fx_rate).toLocaleString(undefined, { maximumFractionDigits: 8 })} {proposalSettlementCurrency}
+                        </span>
+                      </p>
+                      {proposalRate.rate_fetched_at && (
+                        <p className="text-xs text-amber-800">
+                          Rate taken {new Date(proposalRate.rate_fetched_at).toLocaleString()}
+                        </p>
+                      )}
+                      <label className="flex items-start gap-2 text-sm text-amber-900">
+                        <input
+                          type="checkbox"
+                          checked={proposalRateAccepted}
+                          onChange={(e) => setProposalRateAccepted(e.target.checked)}
+                          className="mt-1"
+                        />
+                        <span>I accept this rate for this proposal.</span>
+                      </label>
+                    </>
+                  )}
+                </div>
+              )}
+
+              <div>
                 <Label htmlFor="proposal-notes" className="font-semibold">
                   Additional Notes
                 </Label>
@@ -358,10 +463,41 @@ export const TaskResponseModal: React.FC<TaskResponseModalProps> = ({
           {selectedAction === "accept" && (
             <div className="p-4 bg-green-50 rounded-lg border border-green-200">
               <p className="text-sm text-green-800">
-                ✓ By accepting this task, it will immediately appear in your
-                Todo List with all the details above. You can then mark it as
-                in progress and track completion.
+                Accept this task to set it in your Todo List, get in progress and complete it.
               </p>
+            </div>
+          )}
+
+          {selectedAction === "accept" && isConvertedRate && task && (
+            <div className="p-4 bg-amber-50 rounded-lg border border-amber-200 space-y-3">
+              <p className="text-sm text-amber-900">
+                You will be paid in {task.settlement_currency_code} at the exchange rate of:{" "}
+                <span className="font-semibold">
+                  1 {task.currency_code} = {Number(task.settlement_fx_rate).toLocaleString(undefined, { maximumFractionDigits: 8 })} {task.settlement_currency_code}
+                </span>
+              </p>
+              <p className="text-xs text-amber-800">
+                {task.settlement_fx_rate_source === "books_exchange"
+                  ? bookedExchange
+                    ? `This rate was provided by ${bookedExchange.provider || "provider not recorded"} · ${
+                        bookedExchange.exchange_at
+                          ? new Date(bookedExchange.exchange_at).toLocaleString("en-GB", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit", timeZoneName: "short" })
+                          : bookedExchange.conversion_date
+                      } · ${(Number(bookedExchange.to_ugx_amount) / Number(bookedExchange.from_amount)).toLocaleString(undefined, { maximumFractionDigits: 2 })} ${task.settlement_currency_code} per 1 ${task.currency_code}.`
+                    : "This rate came from a recorded exchange in Books."
+                  : task.settlement_fx_rate_source === "hotel_edited"
+                    ? "This rate was set by the hotel."
+                    : "This rate is live at Exchangerate."}
+              </p>
+              <label className="flex items-start gap-2 text-sm text-amber-900">
+                <input
+                  type="checkbox"
+                  checked={rateAccepted}
+                  onChange={(e) => setRateAccepted(e.target.checked)}
+                  className="mt-1"
+                />
+                <span>I accept this rate for this task.</span>
+              </label>
             </div>
           )}
         </div>
@@ -376,7 +512,7 @@ export const TaskResponseModal: React.FC<TaskResponseModalProps> = ({
           </Button>
           <Button
             onClick={handleSubmitResponse}
-            disabled={!selectedAction || isSubmitting}
+            disabled={!selectedAction || isSubmitting || rateGateBlocked}
             className={
               selectedAction === "accept"
                 ? "bg-green-600 hover:bg-green-700 text-white"

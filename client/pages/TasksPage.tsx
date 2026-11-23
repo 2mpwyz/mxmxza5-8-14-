@@ -72,6 +72,10 @@ const TasksPage: React.FC = () => {
     estimatedTime: "",
     paymentTerms: "",
     currency: "",
+    settlementCurrency: "",
+    settlementRateBasis: "live",
+    settlementExchangeId: "",
+    settlementCustomRate: "",
     budget: "",
     checklist: [] as string[],
     evidenceTypes: [] as string[],
@@ -567,6 +571,21 @@ const TasksPage: React.FC = () => {
       }
       const assigneeName = selectedAssignee.display_name || `${selectedAssignee.first_name} ${selectedAssignee.last_name}`.trim();
 
+      const isConvertedSettlement = (formData.settlementCurrency || formData.currency) !== formData.currency;
+      if (isConvertedSettlement && formData.settlementRateBasis === "exchange" && (!formData.settlementExchangeId || (formData.settlementCurrency || formData.currency) !== "UGX")) {
+        throw new Error("Choose which recorded exchange sets this task's rate");
+      }
+      if (isConvertedSettlement && formData.settlementRateBasis === "custom" && !(parseFloat(formData.settlementCustomRate) > 0)) {
+        throw new Error("Enter a custom rate greater than zero");
+      }
+      const settlementRateFields = !isConvertedSettlement
+        ? {}
+        : formData.settlementRateBasis === "exchange"
+          ? { settlement_fx_conversion_id: formData.settlementExchangeId, settlement_fx_rate_source: "books_exchange" }
+          : formData.settlementRateBasis === "custom"
+            ? { settlement_fx_rate: parseFloat(formData.settlementCustomRate), settlement_fx_rate_source: "hotel_edited" }
+            : {};
+
       const taskData = {
         complaint_id: selectedComplaint?.id || null,
         title: formData.title,
@@ -583,6 +602,8 @@ const TasksPage: React.FC = () => {
         is_from_complaint: selectedComplaint !== null,
         budget: formData.budget ? parseFloat(formData.budget) : null,
         currency_code: formData.currency,
+        settlement_currency_code: formData.settlementCurrency || formData.currency,
+        ...settlementRateFields,
         created_by: currentUser?.id,
         organization_id: tenant.organizationId,
       };
@@ -691,6 +712,10 @@ const TasksPage: React.FC = () => {
         estimatedTime: "",
         paymentTerms: "",
         currency: "",
+        settlementCurrency: "",
+        settlementRateBasis: "live",
+        settlementExchangeId: "",
+        settlementCustomRate: "",
         budget: "",
         checklist: [],
         evidenceTypes: [],

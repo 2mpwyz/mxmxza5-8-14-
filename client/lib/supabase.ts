@@ -114,6 +114,8 @@ export interface Complaint {
   updated_at: string
 }
 
+export type SettlementRateSource = 'same_currency' | 'stored' | 'manual' | 'hotel_approved' | 'hotel_edited' | 'books_exchange'
+
 export interface Task {
   id: string
   complaint_id: string | null
@@ -133,6 +135,11 @@ export interface Task {
   budget: number | null
   final_amount: number | null
   currency_code: string
+  settlement_currency_code: string
+  settlement_fx_rate: number | null
+  settlement_fx_rate_source: SettlementRateSource | null
+  settlement_fx_rate_fetched_at: string | null
+  settlement_fx_conversion_id: string | null
   created_by: string
   created_at: string
   updated_at: string
@@ -147,7 +154,7 @@ export interface WorkerTaskPayment {
   currency_code: string
   worker_currency_code: string | null
   fx_rate: number | null
-  fx_rate_source: 'same_currency' | 'stored' | 'manual' | null
+  fx_rate_source: SettlementRateSource | null
   fx_rate_fetched_at: string | null
   converted_amount: number | null
   converted_tax_amount: number
@@ -193,6 +200,10 @@ export interface TaskProposal {
   proposed_estimated_time: string | null
   proposed_payment_terms: string | null
   proposed_due_date: string | null
+  proposed_settlement_currency_code: string | null
+  proposed_settlement_fx_rate: number | null
+  proposed_settlement_fx_rate_source: Exclude<SettlementRateSource, 'manual'> | null
+  proposed_settlement_fx_rate_fetched_at: string | null
   attachments: Array<{id: string; name: string; size: number}> | null
   created_at: string
   updated_at: string

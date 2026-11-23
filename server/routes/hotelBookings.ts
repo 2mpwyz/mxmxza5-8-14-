@@ -5,7 +5,6 @@ import { verifyHotelSpaPaymentForWebhook } from "./hotelSpa.js";
 
 const flutterwaveBaseUrl = "https://api.flutterwave.com/v3";
 const supportedCurrencies = new Set(["USD", "UGX", "EUR", "GBP", "KES", "TZS", "RWF"]);
-const fxProvider = "open.er-api.com";
 
 export class HotelBookingError extends Error {
   constructor(message: string, readonly status = 400) {
@@ -56,8 +55,21 @@ type FlutterwaveTransaction = {
 type ExchangeRatesPayload = {
   result?: string;
   time_last_update_unix?: number;
+  timestamp?: number;
   rates?: Record<string, number>;
 };
+
+type FxSource = {
+  provider: string;
+  url: string;
+  read: (payload: ExchangeRatesPayload) => { rates?: Record<string, number>; time?: number } | null;
+};
+
+const fxSources: FxSource[] = [
+  { provider: "exchangerate.fun", url: "https://api.exchangerate.fun/latest?base=UGX", read: (payload) => ({ rates: payload.rates, time: payload.timestamp }) },
+  { provider: "open.er-api.com", url: "https://open.er-api.com/v6/latest/UGX", read: (payload) => payload.result === "success" ? { rates: payload.rates, time: payload.time_last_update_unix } : null },
+];
+const fxProviders = fxSources.map((source) => source.provider);
 
 const configuration = () => {
   const supabaseUrl = process.env.VITE_SUPABASE_URL;
@@ -111,6 +123,27 @@ const callServiceRpc = async <T>(name: string, args: Record<string, unknown>): P
   return payload as T;
 };
 
+const fetchLiveRates = async () => {
+  for (const source of fxSources) {
+    try {
+      const response = await fetch(source.url, { signal: AbortSignal.timeout(8000) });
+      if (!response.ok) continue;
+      const parsed = source.read(await response.json() as ExchangeRatesPayload);
+      const rates = parsed?.rates;
+      if (!rates || !parsed?.time) continue;
+      const asOfDate = new Date(parsed.time * 1000);
+      const covered = [...supportedCurrencies]
+        .filter((currency) => currency !== "UGX")
+        .every((currency) => Number.isFinite(rates[currency]) && rates[currency] > 0);
+      const fresh = Date.now() - asOfDate.getTime() <= 36 * 60 * 60 * 1000 && asOfDate.getTime() <= Date.now() + 5 * 60 * 1000;
+      if (covered && fresh) return { rates, asOfDate, provider: source.provider };
+    } catch {
+      continue;
+    }
+  }
+  throw new Error("The exchange-rate service is temporarily unavailable");
+};
+
 const fetchAndStoreRates = async () => {
   const cached = await readService<Array<{ quote_currency: string; rate: number | string; fetched_at: string; stored_at: string; provider: string }>>(
     "books_fx_rates?base_currency=eq.UGX&select=quote_currency,rate,fetched_at,stored_at,provider&order=stored_at.desc",
@@ -120,13 +153,13 @@ const fetchAndStoreRates = async () => {
   const fetchedAt = cached[0]?.fetched_at ? new Date(cached[0].fetched_at).getTime() : 0;
   const cachedRates = Object.fromEntries(cached.map((row) => [row.quote_currency.trim(), Number(row.rate)]));
   const cachedSnapshotIsUsable = cached.length >= supportedCurrencies.size - 1
-    && currentTime - mostRecent < 30 * 60 * 1000
+    && currentTime - mostRecent < 10 * 60 * 1000
     && mostRecent <= currentTime + 5 * 60 * 1000
     && currentTime - fetchedAt <= 36 * 60 * 60 * 1000
     && fetchedAt <= currentTime + 5 * 60 * 1000
-    && cached.every((row) => row.provider === fxProvider
+    && cached.every((row) => fxProviders.includes(row.provider)
       && new Date(row.fetched_at).getTime() === fetchedAt
-      && currentTime - new Date(row.stored_at).getTime() < 30 * 60 * 1000
+      && currentTime - new Date(row.stored_at).getTime() < 10 * 60 * 1000
       && new Date(row.stored_at).getTime() <= currentTime + 5 * 60 * 1000
       && Number.isFinite(Number(row.rate))
       && Number(row.rate) > 0)
@@ -135,23 +168,14 @@ const fetchAndStoreRates = async () => {
     return { rates: { UGX: 1, ...cachedRates }, asOf: cached[0].fetched_at, provider: cached[0].provider };
   }
 
-  const response = await fetch("https://open.er-api.com/v6/latest/UGX", { signal: AbortSignal.timeout(8000) });
-  const payload = await response.json() as ExchangeRatesPayload;
-  if (!response.ok || payload.result !== "success" || !payload.rates || !payload.time_last_update_unix) {
-    throw new Error("The exchange-rate service is temporarily unavailable");
-  }
-  const asOfDate = new Date(payload.time_last_update_unix * 1000);
-  if (Date.now() - asOfDate.getTime() > 36 * 60 * 60 * 1000 || asOfDate.getTime() > Date.now() + 5 * 60 * 1000) {
-    throw new Error("The exchange-rate service returned an outdated snapshot");
-  }
-  const asOf = asOfDate.toISOString();
-  const rates = { ...payload.rates, UGX: 1 };
+  const live = await fetchLiveRates();
+  const asOf = live.asOfDate.toISOString();
+  const rates = { ...live.rates, UGX: 1 };
   const rows = [...supportedCurrencies]
-    .filter((currency) => currency !== "UGX" && Number.isFinite(rates[currency]) && rates[currency] > 0)
-    .map((currency) => ({ base_currency: "UGX", quote_currency: currency, rate: rates[currency], provider: fxProvider, fetched_at: asOf, stored_at: new Date().toISOString() }));
-  if (rows.length !== supportedCurrencies.size - 1) throw new Error("The exchange-rate service is missing a supported hotel currency");
+    .filter((currency) => currency !== "UGX")
+    .map((currency) => ({ base_currency: "UGX", quote_currency: currency, rate: rates[currency], provider: live.provider, fetched_at: asOf, stored_at: new Date().toISOString() }));
   await writeService("books_fx_rates?on_conflict=base_currency,quote_currency", "POST", rows, "resolution=merge-duplicates,return=minimal");
-  return { rates, asOf, provider: fxProvider };
+  return { rates, asOf, provider: live.provider };
 };
 
 const safeText = (value: unknown, maxLength: number) => typeof value === "string" ? value.trim().slice(0, maxLength) : "";
