@@ -425,7 +425,7 @@ const TaskCreationForm: React.FC<TaskCreationFormProps> = ({
               {needsConversion && (
                 <p className="text-xs text-muted-foreground">
                   {fxError
-                    ? `Today's rate is unavailable (${fxError}). The rate is set when the task is saved.`
+                    ? `Today's rate is unavailable (${fxError}). The rate is locked in when you create the task.`
                     : indicativeRate
                       ? `Today's live rate: 1 ${formData.currency} = ${indicativeRate.toLocaleString(undefined, { maximumFractionDigits: 8 })} ${settlementCurrency}${fxAsOf ? ` at ${new Date(fxAsOf).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })}` : ""}. Select your rate below.`
                       : "Loading today's rate..."}

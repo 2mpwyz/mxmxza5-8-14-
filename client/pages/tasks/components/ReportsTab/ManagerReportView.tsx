@@ -359,8 +359,8 @@ const ManagerReportView: React.FC<ManagerReportViewProps> = ({
           {isConvertedSettlement && (
             <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg text-sm text-blue-900 space-y-2">
               <p className="font-medium">
-                Settlement: {task.settlement_currency_code} at 1 {task.currency_code} = {task.settlement_fx_rate === null ? "?" : Number(task.settlement_fx_rate).toLocaleString(undefined, { maximumFractionDigits: 8 })} {task.settlement_currency_code}
-                {task.settlement_fx_rate_source ? ` (${task.settlement_fx_rate_source.replace(/_/g, " ")})` : ""}
+                Worker is paid in {task.settlement_currency_code} at 1 {task.currency_code} = {task.settlement_fx_rate === null ? "?" : Number(task.settlement_fx_rate).toLocaleString(undefined, { maximumFractionDigits: 8 })} {task.settlement_currency_code}
+                {task.settlement_fx_rate_source === "stored" ? " (live rate)" : task.settlement_fx_rate_source === "books_exchange" ? " (from a recorded exchange in Books)" : task.settlement_fx_rate_source === "hotel_edited" || task.settlement_fx_rate_source === "hotel_approved" ? " (set by the hotel)" : task.settlement_fx_rate_source === "manual" ? " (entered manually)" : ""}
               </p>
               <label htmlFor="settlement-action" className="block font-medium">Exchange rate at approval</label>
               <select
@@ -370,7 +370,7 @@ const ManagerReportView: React.FC<ManagerReportViewProps> = ({
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-white"
               >
                 <option value="keep">Keep the agreed rate</option>
-                <option value="refresh">Refresh to the current stored rate</option>
+                <option value="refresh">Update to today's live rate</option>
                 <option value="edit">Enter a different rate</option>
               </select>
               {settlementAction === "edit" && (
