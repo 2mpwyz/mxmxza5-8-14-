@@ -465,9 +465,6 @@ export const TaskResponseModal: React.FC<TaskResponseModalProps> = ({
               </p>
               <p className="text-xs text-amber-800">
                 {task.settlement_fx_rate_source === "books_exchange" ? "This rate came from a recorded exchange in Books." : task.settlement_fx_rate_source === "hotel_edited" ? "This rate was set by the hotel." : "This rate came from Exchangerate."}
-                {liveRates?.[task.settlement_currency_code] && liveRates?.[task.currency_code]
-                  ? ` Today's rate: 1 ${task.currency_code} = ${(liveRates[task.settlement_currency_code] / liveRates[task.currency_code]).toLocaleString(undefined, { maximumFractionDigits: 8 })} ${task.settlement_currency_code}. This is for comparison only and does not change your pay.`
-                  : ""}
               </p>
               <label className="flex items-start gap-2 text-sm text-amber-900">
                 <input
