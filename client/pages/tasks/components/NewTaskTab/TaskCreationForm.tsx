@@ -95,6 +95,7 @@ const TaskCreationForm: React.FC<TaskCreationFormProps> = ({
 }) => {
   const [fxRates, setFxRates] = useState<Record<string, number> | null>(null);
   const [fxError, setFxError] = useState("");
+  const [fxAsOf, setFxAsOf] = useState<string | null>(null);
   const [exchanges, setExchanges] = useState<FundingExchange[]>([]);
   const { tenant } = useHotelTenant();
   const organizationId = tenant?.organizationId ?? null;
@@ -126,9 +127,12 @@ const TaskCreationForm: React.FC<TaskCreationFormProps> = ({
     void (async () => {
       try {
         const response = await fetch("/api/books/fx-rates");
-        const payload = (await response.json()) as { rates?: Record<string, number>; error?: string };
+        const payload = (await response.json()) as { rates?: Record<string, number>; asOf?: string; error?: string };
         if (!response.ok || !payload.rates) throw new Error(payload.error || "Exchange rates unavailable");
-        if (!cancelled) setFxRates(payload.rates);
+        if (!cancelled) {
+          setFxRates(payload.rates);
+          setFxAsOf(payload.asOf ?? null);
+        }
       } catch (error) {
         if (!cancelled) setFxError(error instanceof Error ? error.message : "Exchange rates unavailable");
       }
@@ -416,7 +420,7 @@ const TaskCreationForm: React.FC<TaskCreationFormProps> = ({
                   {fxError
                     ? `Today's rate is unavailable (${fxError}). The rate is set when the task is saved.`
                     : indicativeRate
-                      ? `Today's rate: 1 ${formData.currency} = ${indicativeRate.toLocaleString(undefined, { maximumFractionDigits: 8 })} ${settlementCurrency}. This is only a preview. The task saves the rate chosen below.`
+                      ? `Today's live rate: 1 ${formData.currency} = ${indicativeRate.toLocaleString(undefined, { maximumFractionDigits: 8 })} ${settlementCurrency}${fxAsOf ? ` at ${new Date(fxAsOf).toLocaleString("en-GB", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit", timeZoneName: "short" })}` : ""}. Select your rate below.`
                       : "Loading today's rate..."}
                 </p>
               )}
@@ -468,7 +472,7 @@ const TaskCreationForm: React.FC<TaskCreationFormProps> = ({
                 )}
 
                 <p className="text-xs text-muted-foreground">
-                  The worker will see this rate and must accept it before starting. It does not change after the task is saved.
+                  Agree with the worker on the appropriate exchange rate.
                 </p>
               </div>
             )}
