@@ -392,7 +392,7 @@ const TaskCreationForm: React.FC<TaskCreationFormProps> = ({
                   step="0.01"
                 />
                 <p className="text-xs text-muted-foreground">
-                  The budget allocated to complete this task, in the selected currency
+                  Your budget for this task, in the selected currency
                 </p>
               </div>
             </div>
@@ -420,7 +420,7 @@ const TaskCreationForm: React.FC<TaskCreationFormProps> = ({
                   {fxError
                     ? `Today's rate is unavailable (${fxError}). The rate is set when the task is saved.`
                     : indicativeRate
-                      ? `Today's live rate: 1 ${formData.currency} = ${indicativeRate.toLocaleString(undefined, { maximumFractionDigits: 8 })} ${settlementCurrency}${fxAsOf ? ` at ${new Date(fxAsOf).toLocaleString("en-GB", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit", timeZoneName: "short" })}` : ""}. Select your rate below.`
+                      ? `Today's live rate: 1 ${formData.currency} = ${indicativeRate.toLocaleString(undefined, { maximumFractionDigits: 8 })} ${settlementCurrency}${fxAsOf ? ` at ${new Date(fxAsOf).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })}` : ""}. Select your rate below.`
                       : "Loading today's rate..."}
                 </p>
               )}
