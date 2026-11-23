@@ -450,9 +450,7 @@ export const TaskResponseModal: React.FC<TaskResponseModalProps> = ({
           {selectedAction === "accept" && (
             <div className="p-4 bg-green-50 rounded-lg border border-green-200">
               <p className="text-sm text-green-800">
-                ✓ By accepting this task, it will immediately appear in your
-                Todo List with all the details above. You can then mark it as
-                in progress and track completion.
+                Accepting this task will create a Todo List for it. Then you can set the task in progress and complete it.
               </p>
             </div>
           )}
@@ -460,13 +458,13 @@ export const TaskResponseModal: React.FC<TaskResponseModalProps> = ({
           {selectedAction === "accept" && isConvertedRate && task && (
             <div className="p-4 bg-amber-50 rounded-lg border border-amber-200 space-y-3">
               <p className="text-sm text-amber-900">
-                You will be paid in {task.settlement_currency_code} at this rate:{" "}
+                You will be paid in {task.settlement_currency_code} at the exchange rate of:{" "}
                 <span className="font-semibold">
                   1 {task.currency_code} = {Number(task.settlement_fx_rate).toLocaleString(undefined, { maximumFractionDigits: 8 })} {task.settlement_currency_code}
                 </span>
               </p>
               <p className="text-xs text-amber-800">
-                Where this rate came from: {task.settlement_fx_rate_source === "books_exchange" ? "an exchange the hotel recorded in Books" : task.settlement_fx_rate_source === "hotel_edited" ? "a rate the hotel set" : "today's stored rate"}.
+                {task.settlement_fx_rate_source === "books_exchange" ? "This rate came from a recorded exchange in Books." : task.settlement_fx_rate_source === "hotel_edited" ? "This rate was set by the hotel." : "This rate came from Exchangerate."}
                 {liveRates?.[task.settlement_currency_code] && liveRates?.[task.currency_code]
                   ? ` Today's rate: 1 ${task.currency_code} = ${(liveRates[task.settlement_currency_code] / liveRates[task.currency_code]).toLocaleString(undefined, { maximumFractionDigits: 8 })} ${task.settlement_currency_code}. This is for comparison only and does not change your pay.`
                   : ""}
