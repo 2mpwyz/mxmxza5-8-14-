@@ -47,7 +47,6 @@ export const TaskResponseModal: React.FC<TaskResponseModalProps> = ({
   const [proposedSettlementCurrency, setProposedSettlementCurrency] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [rateAccepted, setRateAccepted] = useState(false);
-  const [liveRates, setLiveRates] = useState<Record<string, number> | null>(null);
   const [proposalRate, setProposalRate] = useState<{ fx_rate: number; rate_fetched_at: string | null } | null>(null);
   const [proposalRateError, setProposalRateError] = useState<string | null>(null);
   const [proposalRateAccepted, setProposalRateAccepted] = useState(false);
@@ -65,19 +64,6 @@ export const TaskResponseModal: React.FC<TaskResponseModalProps> = ({
   const rateGateBlocked =
     (selectedAction === "accept" && isConvertedRate && !rateAccepted) ||
     (selectedAction === "propose" && isConvertedProposal && (!proposalRate || !proposalRateAccepted));
-
-  useEffect(() => {
-    if (!isOpen || !isConvertedRate || liveRates) return;
-    void (async () => {
-      try {
-        const response = await fetch("/api/books/fx-rates");
-        const payload = (await response.json()) as { rates?: Record<string, number> };
-        if (response.ok && payload.rates) setLiveRates(payload.rates);
-      } catch {
-        setLiveRates(null);
-      }
-    })();
-  }, [isOpen, isConvertedRate, liveRates]);
 
   useEffect(() => {
     const conversionId = task?.settlement_fx_conversion_id;
@@ -502,9 +488,6 @@ export const TaskResponseModal: React.FC<TaskResponseModalProps> = ({
                   : task.settlement_fx_rate_source === "hotel_edited"
                     ? "This rate was set by the hotel."
                     : "This rate is live at Exchangerate."}
-                {liveRates?.[task.settlement_currency_code] && liveRates?.[task.currency_code]
-                  ? ` Today's rate: 1 ${task.currency_code} = ${(liveRates[task.settlement_currency_code] / liveRates[task.currency_code]).toLocaleString(undefined, { maximumFractionDigits: 8 })} ${task.settlement_currency_code}. This is for comparison only and does not change your pay.`
-                  : ""}
               </p>
               <label className="flex items-start gap-2 text-sm text-amber-900">
                 <input
