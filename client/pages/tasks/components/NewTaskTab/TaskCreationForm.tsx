@@ -147,6 +147,13 @@ const TaskCreationForm: React.FC<TaskCreationFormProps> = ({
       ? fxRates[settlementCurrency] / fxRates[formData.currency]
       : null;
 
+  const selectedWorker = [...externalVendors, ...internalStaff].find(
+    (person) => person.id === formData.assignee,
+  );
+  const workerLabel = selectedWorker
+    ? `${selectedWorker.first_name} ${selectedWorker.last_name}`.trim()
+    : "the worker";
+
   const handleAddChecklistItem = () => {
     const updatedChecklist = [...(formData.checklist || []), ""];
     onFormChange("checklist", updatedChecklist);
@@ -472,7 +479,7 @@ const TaskCreationForm: React.FC<TaskCreationFormProps> = ({
                 )}
 
                 <p className="text-xs text-muted-foreground">
-                  Agree with the worker on the appropriate exchange rate.
+                  Provide the appropriate exchange rate which {workerLabel} will agree on, to accept this task.
                 </p>
               </div>
             )}
