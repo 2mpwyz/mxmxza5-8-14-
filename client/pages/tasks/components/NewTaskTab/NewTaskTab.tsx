@@ -19,6 +19,9 @@ interface FormData {
   paymentTerms: string;
   currency: string;
   settlementCurrency: string;
+  settlementRateBasis: string;
+  settlementExchangeId: string;
+  settlementCustomRate: string;
   budget: string;
   checklist: string[];
   evidenceTypes: string[];

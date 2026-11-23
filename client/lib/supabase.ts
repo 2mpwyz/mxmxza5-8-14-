@@ -114,7 +114,7 @@ export interface Complaint {
   updated_at: string
 }
 
-export type SettlementRateSource = 'same_currency' | 'stored' | 'manual' | 'hotel_approved' | 'hotel_edited'
+export type SettlementRateSource = 'same_currency' | 'stored' | 'manual' | 'hotel_approved' | 'hotel_edited' | 'books_exchange'
 
 export interface Task {
   id: string

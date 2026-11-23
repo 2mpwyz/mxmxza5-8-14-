@@ -23,6 +23,18 @@ import FileUploadZone, {
 } from "../../../../components/FileUploadZone";
 import TaskCreationTipsSidebar from "./TaskCreationTipsSidebar";
 import { TASK_CURRENCIES } from "../../../../lib/taskCurrency";
+import { supabase } from "../../../../lib/supabase";
+import { useHotelTenant } from "../../../../lib/hotelTenant";
+
+type FundingExchange = { id: string; conversion_date: string; exchange_at: string | null; provider: string | null; from_amount: number; to_ugx_amount: number };
+
+const formatExchangeOption = (exchange: FundingExchange, currency: string) => {
+  const when = exchange.exchange_at
+    ? new Date(exchange.exchange_at).toLocaleString("en-GB", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit", timeZoneName: "short" })
+    : exchange.conversion_date;
+  const rate = Number(exchange.to_ugx_amount) / Number(exchange.from_amount);
+  return `${exchange.provider || "Exchange"} · ${when} · ${rate.toLocaleString(undefined, { maximumFractionDigits: 2 })} UGX per 1 ${currency}`;
+};
 
 interface FormData {
   title: string;
@@ -36,6 +48,9 @@ interface FormData {
   paymentTerms: string;
   currency: string;
   settlementCurrency: string;
+  settlementRateBasis: string;
+  settlementExchangeId: string;
+  settlementCustomRate: string;
   budget: string;
   checklist: string[];
   evidenceTypes: string[];
@@ -80,9 +95,30 @@ const TaskCreationForm: React.FC<TaskCreationFormProps> = ({
 }) => {
   const [fxRates, setFxRates] = useState<Record<string, number> | null>(null);
   const [fxError, setFxError] = useState("");
+  const [exchanges, setExchanges] = useState<FundingExchange[]>([]);
+  const { tenant } = useHotelTenant();
+  const organizationId = tenant?.organizationId ?? null;
   const settlementCurrency = formData.settlementCurrency || formData.currency;
   const needsConversion =
     !!formData.currency && !!settlementCurrency && settlementCurrency !== formData.currency;
+  const canUseExchange = needsConversion && settlementCurrency === "UGX";
+
+  useEffect(() => {
+    if (!canUseExchange || !organizationId) return;
+    void (async () => {
+      const { data, error } = await supabase
+        .from("books_fx_conversions")
+        .select("id, conversion_date, exchange_at, provider, from_amount, to_ugx_amount")
+        .eq("organization_id", organizationId)
+        .eq("from_currency_code", formData.currency)
+        .order("conversion_date", { ascending: false });
+      if (error) {
+        setFxError(error.message);
+        return;
+      }
+      setExchanges((data ?? []) as FundingExchange[]);
+    })();
+  }, [canUseExchange, organizationId, formData.currency]);
 
   useEffect(() => {
     if (!needsConversion || fxRates) return;
@@ -385,6 +421,57 @@ const TaskCreationForm: React.FC<TaskCreationFormProps> = ({
                 </p>
               )}
             </div>
+
+            {needsConversion && (
+              <div className="space-y-3 p-4 bg-amber-50 rounded-lg border border-amber-200">
+                <Label className="text-base font-semibold">Rate for this task</Label>
+                <Select
+                  value={formData.settlementRateBasis}
+                  onValueChange={(value) => onFormChange("settlementRateBasis", value)}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="live">Live stored rate</SelectItem>
+                    {canUseExchange && <SelectItem value="exchange">A recorded exchange</SelectItem>}
+                    <SelectItem value="custom">Custom rate</SelectItem>
+                  </SelectContent>
+                </Select>
+
+                {formData.settlementRateBasis === "exchange" && (
+                  <Select
+                    value={formData.settlementExchangeId}
+                    onValueChange={(value) => onFormChange("settlementExchangeId", value)}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder={exchanges.length ? "Choose an exchange" : "No recorded exchanges for this currency"} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {exchanges.map((exchange) => (
+                        <SelectItem key={exchange.id} value={exchange.id}>
+                          {formatExchangeOption(exchange, formData.currency)}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+
+                {formData.settlementRateBasis === "custom" && (
+                  <Input
+                    type="number"
+                    step="0.00000001"
+                    placeholder={`UGX per 1 ${formData.currency}`}
+                    value={formData.settlementCustomRate}
+                    onChange={(e) => onFormChange("settlementCustomRate", e.target.value)}
+                  />
+                )}
+
+                <p className="text-xs text-muted-foreground">
+                  The worker sees this rate and must accept it before starting. It stays fixed for this task.
+                </p>
+              </div>
+            )}
 
             {/* Checklist Section */}
             <div className="space-y-3 p-4 bg-blue-50 rounded-lg border border-blue-200">

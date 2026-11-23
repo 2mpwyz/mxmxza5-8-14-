@@ -2,17 +2,6 @@ import React, { useEffect, useState } from "react";
 import { supabase, Task as TaskType, WorkerTaskPayment } from "../../../../lib/supabase";
 import { toast } from "../../../../hooks/use-toast";
 import { formatTaskAmount } from "../../../../lib/taskCurrency";
-import { useHotelTenant } from "../../../../lib/hotelTenant";
-
-type FundingConversion = { id: string; conversion_date: string; exchange_at: string | null; provider: string | null; from_currency_code: string; from_amount: number; to_ugx_amount: number };
-
-const formatConversionLabel = (conversion: FundingConversion) => {
-  const when = conversion.exchange_at
-    ? new Date(conversion.exchange_at).toLocaleString("en-GB", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit", timeZoneName: "short" })
-    : conversion.conversion_date;
-  const rate = Number(conversion.to_ugx_amount) / Number(conversion.from_amount);
-  return `${conversion.provider || "Exchange"} · ${when} · ${rate.toLocaleString(undefined, { maximumFractionDigits: 2 })} UGX per 1 ${conversion.from_currency_code}`;
-};
 
 const PAYMENT_METHODS: Array<{ value: WorkerTaskPayment["payment_method"]; label: string }> = [
   { value: "bank_transfer", label: "Bank transfer" },
@@ -32,11 +21,6 @@ const TaskPaymentPanel: React.FC<TaskPaymentPanelProps> = ({ task }) => {
   const [isSaving, setIsSaving] = useState(false);
   const [method, setMethod] = useState<WorkerTaskPayment["payment_method"]>("bank_transfer");
   const [reference, setReference] = useState("");
-  const [fundingConversions, setFundingConversions] = useState<FundingConversion[]>([]);
-  const [selectedConversionId, setSelectedConversionId] = useState("");
-  const { tenant } = useHotelTenant();
-  const organizationId = tenant?.organizationId ?? null;
-  const paysInUgx = task.currency_code !== "UGX" && (task.settlement_currency_code || task.currency_code) === "UGX";
 
   const agreedAmount = task.final_amount ?? 0;
   const hasAgreedAmount = agreedAmount > 0;
@@ -72,7 +56,6 @@ const TaskPaymentPanel: React.FC<TaskPaymentPanelProps> = ({ task }) => {
       p_task_id: task.id,
       p_payment_method: method,
       p_payment_reference: trimmedReference,
-      ...(selectedConversionId ? { p_fx_conversion_id: selectedConversionId } : {}),
     });
     setIsSaving(false);
     if (error) {
@@ -81,26 +64,8 @@ const TaskPaymentPanel: React.FC<TaskPaymentPanelProps> = ({ task }) => {
     }
     toast({ title: "Payment recorded", description: "The worker will be asked to confirm receipt before the receipt is issued." });
     setReference("");
-    setSelectedConversionId("");
     void loadPayment();
   };
-
-  useEffect(() => {
-    if (!organizationId || !paysInUgx) return;
-    void (async () => {
-      const { data, error } = await supabase
-        .from("books_fx_conversions")
-        .select("id, conversion_date, exchange_at, provider, from_currency_code, from_amount, to_ugx_amount")
-        .eq("organization_id", organizationId)
-        .eq("from_currency_code", task.currency_code)
-        .order("conversion_date", { ascending: false });
-      if (error) {
-        toast({ title: "Could not load currency exchanges", description: error.message, variant: "destructive" });
-        return;
-      }
-      setFundingConversions((data ?? []) as FundingConversion[]);
-    })();
-  }, [organizationId, paysInUgx, task.currency_code]);
 
   if (isLoading) return null;
 
@@ -154,26 +119,6 @@ const TaskPaymentPanel: React.FC<TaskPaymentPanelProps> = ({ task }) => {
           {task.settlement_currency_code && task.settlement_currency_code !== task.currency_code && task.settlement_fx_rate ? (
             <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg text-sm text-blue-900">
               Paid in {task.settlement_currency_code} at the agreed rate: 1 {task.currency_code} = {Number(task.settlement_fx_rate).toLocaleString(undefined, { maximumFractionDigits: 8 })} {task.settlement_currency_code}
-            </div>
-          ) : null}
-          {paysInUgx && fundingConversions.length > 0 ? (
-            <div>
-              <label htmlFor="worker-payment-fx-conversion" className="block text-sm font-medium text-gray-700 mb-1">
-                Other Exchange Rate (optional)
-              </label>
-              <select
-                id="worker-payment-fx-conversion"
-                value={selectedConversionId}
-                onChange={(event) => setSelectedConversionId(event.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-              >
-                <option value="">None</option>
-                {fundingConversions.map((conversion) => (
-                  <option key={conversion.id} value={conversion.id}>
-                    {formatConversionLabel(conversion)}
-                  </option>
-                ))}
-              </select>
             </div>
           ) : null}
           <div>

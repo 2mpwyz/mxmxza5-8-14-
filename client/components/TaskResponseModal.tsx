@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   Dialog,
   DialogContent,
@@ -46,11 +46,28 @@ export const TaskResponseModal: React.FC<TaskResponseModalProps> = ({
   const [proposedTimeline, setProposedTimeline] = useState("");
   const [proposedSettlementCurrency, setProposedSettlementCurrency] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [rateAccepted, setRateAccepted] = useState(false);
+  const [liveRates, setLiveRates] = useState<Record<string, number> | null>(null);
+  const isConvertedRate = !!task && task.settlement_currency_code !== task.currency_code && !!task.settlement_fx_rate;
+
+  useEffect(() => {
+    if (!isOpen || !isConvertedRate || liveRates) return;
+    void (async () => {
+      try {
+        const response = await fetch("/api/books/fx-rates");
+        const payload = (await response.json()) as { rates?: Record<string, number> };
+        if (response.ok && payload.rates) setLiveRates(payload.rates);
+      } catch {
+        setLiveRates(null);
+      }
+    })();
+  }, [isOpen, isConvertedRate, liveRates]);
 
   if (!task) return null;
 
   const handleSubmitResponse = async () => {
     if (!selectedAction) return;
+    if (selectedAction === "accept" && isConvertedRate && !rateAccepted) return;
 
     setIsSubmitting(true);
     try {
@@ -116,6 +133,7 @@ export const TaskResponseModal: React.FC<TaskResponseModalProps> = ({
       setProposalNotes("");
       setProposedTimeline("");
       setProposedSettlementCurrency("");
+      setRateAccepted(false);
       onClose();
       onResponseSubmitted?.();
     } catch (error) {
@@ -392,6 +410,32 @@ export const TaskResponseModal: React.FC<TaskResponseModalProps> = ({
               </p>
             </div>
           )}
+
+          {selectedAction === "accept" && isConvertedRate && task && (
+            <div className="p-4 bg-amber-50 rounded-lg border border-amber-200 space-y-3">
+              <p className="text-sm text-amber-900">
+                You will be paid in {task.settlement_currency_code} at this rate:{" "}
+                <span className="font-semibold">
+                  1 {task.currency_code} = {Number(task.settlement_fx_rate).toLocaleString(undefined, { maximumFractionDigits: 8 })} {task.settlement_currency_code}
+                </span>
+              </p>
+              <p className="text-xs text-amber-800">
+                Rate source: {task.settlement_fx_rate_source === "books_exchange" ? "the hotel's recorded exchange" : task.settlement_fx_rate_source === "hotel_edited" ? "set by the hotel" : "the stored live rate"}.
+                {liveRates?.[task.settlement_currency_code] && liveRates?.[task.currency_code]
+                  ? ` Today's live rate: 1 ${task.currency_code} = ${(liveRates[task.settlement_currency_code] / liveRates[task.currency_code]).toLocaleString(undefined, { maximumFractionDigits: 8 })} ${task.settlement_currency_code}. This is for comparison only.`
+                  : ""}
+              </p>
+              <label className="flex items-start gap-2 text-sm text-amber-900">
+                <input
+                  type="checkbox"
+                  checked={rateAccepted}
+                  onChange={(e) => setRateAccepted(e.target.checked)}
+                  className="mt-1"
+                />
+                <span>I accept this rate for this task.</span>
+              </label>
+            </div>
+          )}
         </div>
 
         <DialogFooter className="gap-3">
@@ -404,7 +448,7 @@ export const TaskResponseModal: React.FC<TaskResponseModalProps> = ({
           </Button>
           <Button
             onClick={handleSubmitResponse}
-            disabled={!selectedAction || isSubmitting}
+            disabled={!selectedAction || isSubmitting || (selectedAction === "accept" && isConvertedRate && !rateAccepted)}
             className={
               selectedAction === "accept"
                 ? "bg-green-600 hover:bg-green-700 text-white"
